@@ -1,0 +1,36 @@
+name: Fonds d'écran
+
+# Chaque lundi : la liste des « images remarquables » libres de Wikimedia Commons (paysages, côtes, montagnes, France),
+# avec le nom du photographe et la licence, publiée sur la branche « fonds ». Gratuit, sans clé.
+on:
+  schedule:
+    - cron: '40 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fonds
+  cancel-in-progress: false
+
+jobs:
+  fonds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Liste des photos
+        run: node outils/fonds.mjs sortie
+      - name: Publication sur la branche fonds
+        run: |
+          cd sortie
+          git init -q -b fonds
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Fonds du $(date -u +%F)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" fonds
