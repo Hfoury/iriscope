@@ -7,7 +7,9 @@ const OUT = process.argv[2] || 'sortie';
 const API = 'https://commons.wikimedia.org/w/api.php';
 const UA = 'IriscopeFonds/1.0 (https://github.com/Hfoury/iriscope; fonds hebdomadaires)';
 const ROOTS = ['Featured pictures of landscapes', 'Featured pictures of France', 'Featured pictures of coasts', 'Featured pictures of mountains', 'Featured pictures of lakes', 'Featured pictures of forests', 'Featured pictures of skies'];
-const MAX = 2500, DEPTH = 2;
+// chaque thème a sa part (sinon les paysages prennent toute la place et la France n'apparaît pas)
+const MAX = 3000, PER_ROOT = { 'Featured pictures of France': 900 }, PER = 350, DEPTH = 2;
+let cap = MAX;
 const OK_LIC = /^(cc0|public domain|pd|cc by(-sa)? ?[0-9.]*)/i;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function ask(params) {
@@ -22,7 +24,7 @@ async function ask(params) {
 const strip = s => String(s || '').replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&#039;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
 const seenCat = new Set(), photos = new Map();
 async function walk(cat, depth) {
-  if (seenCat.has(cat) || photos.size >= MAX) return;
+  if (seenCat.has(cat) || photos.size >= cap) return;
   seenCat.add(cat);
   let cont = {};
   const subs = [];
@@ -38,14 +40,14 @@ async function walk(cat, depth) {
       if (ii.width < 1600 || ii.height < 900) continue;
       const artist = strip(m.Artist && m.Artist.value).slice(0, 60) || 'Auteur sur Wikimedia Commons';
       photos.set(pg.title, { u: ii.thumburl, w: ii.thumbwidth, h: ii.thumbheight, a: artist, l: lic, p: ii.descriptionshorturl || ii.descriptionurl, t: strip(m.ObjectName && m.ObjectName.value).slice(0, 80) || pg.title.replace(/^File:|\.[a-z]+$/gi, '') });
-      if (photos.size >= MAX) break;
+      if (photos.size >= cap) break;
     }
     cont = j.continue || null;
     await sleep(600);
-  } while (cont && photos.size < MAX);
+  } while (cont && photos.size < cap);
   if (depth > 0) for (const s of subs) await walk(s, depth - 1);
 }
-for (const r of ROOTS) { await walk(r, DEPTH).catch(e => console.log('⚠️', r, e.message)); console.log(r, '→', photos.size, 'photos au total'); }
+for (const r of ROOTS) { cap = Math.min(MAX, photos.size + (PER_ROOT[r] || PER)); await walk(r, DEPTH).catch(e => console.log('⚠️', r, e.message)); console.log(r, '→', photos.size, 'photos au total'); }
 // Flickr (si le secret FLICKR_KEY existe) : licences libres réutilisables commercialement seulement
 // 4 = CC BY 2.0, 5 = CC BY-SA 2.0, 9 = CC0, 10 = marque du domaine public ; jamais NC ni ND
 const FLICKR_KEY = process.env.FLICKR_KEY || '';
