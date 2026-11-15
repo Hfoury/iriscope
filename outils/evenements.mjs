@@ -5,6 +5,7 @@
 // Usage : DATATOURISME_KEY=... node outils/evenements.mjs sortie
 import fs from 'node:fs';
 import path from 'node:path';
+import { lireAgendas } from './agendas.mjs';
 
 const KEY = process.env.DATATOURISME_KEY;
 if (!KEY) { console.error('Secret DATATOURISME_KEY absent : ajoute-le dans Settings > Secrets and variables > Actions.'); process.exit(2); }
@@ -100,12 +101,28 @@ for (let page = first; page; ) {
 console.log('Exemple reçu :', JSON.stringify(sample, null, 1).slice(0, 2500));
 if (!kept) { console.error('Aucun événement exploitable : rien n\'est publié.'); process.exit(1); }
 
+// Agendas ouverts d'appoint (outils/agendas.mjs) : versés dans les mêmes tuiles, chacun avec son crédit (champ s),
+// sauf ce que DATAtourisme donne déjà (même jour, à moins de 400 m, titres qui commencent pareil).
+const norm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 14);
+const km = (a, b, c, d) => Math.hypot((a - c) * 111, (b - d) * 111 * Math.cos(a * Math.PI / 180));
+const extra = await lireAgendas(from, to);
+let ajoutes = 0;
+for (const ev of extra.events) {
+  const list = (byTile[tileOf(ev.lat, ev.lon)] ||= []);
+  const k = norm(ev.t), d0 = ev.p[0].s;
+  if (list.some(x => x.p[0].s === d0 && km(x.lat, x.lon, ev.lat, ev.lon) < 0.4 && (norm(x.t).startsWith(k) || k.startsWith(norm(x.t))))) continue;
+  list.push(ev); ajoutes++;
+  const dep = /^\d{5}$/.test(ev.cp) ? ev.cp.slice(0, 2) : '';
+  if (dep) byDept[dep] = (byDept[dep] || 0) + 1;
+}
+console.log(`Agendas d'appoint : ${extra.events.length} lus, ${ajoutes} ajoutés après dédoublonnage.`);
+
 fs.mkdirSync(path.join(OUT, 't'), { recursive: true });
-const index = { source: 'DATAtourisme (Licence Ouverte 2.0)', updated: now.toISOString(), from, to, total: kept, tiles: Object.keys(byTile).length, depts: byDept };
+const index = { source: 'DATAtourisme (Licence Ouverte 2.0) et agendas ouverts d\'appoint', updated: now.toISOString(), from, to, total: kept + ajoutes, datatourisme: kept, agendas: extra.bilan, tiles: Object.keys(byTile).length, depts: byDept };
 for (const [t, list] of Object.entries(byTile)) {
   list.sort((a, b) => a.p[0].s.localeCompare(b.p[0].s));
   fs.writeFileSync(path.join(OUT, 't', `${t}.json`), JSON.stringify({ updated: index.updated, events: list }));
 }
 fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(index));
-fs.writeFileSync(path.join(OUT, '..', 'README.md'), `Données publiées automatiquement pour l'appli Iriscope.\n\nÉvénements : DATAtourisme, Licence Ouverte 2.0. Mise à jour : ${index.updated}. ${kept} événements, ${Object.keys(byDept).length} départements, ${index.tiles} tuiles.\n`);
+fs.writeFileSync(path.join(OUT, '..', 'README.md'), `Données publiées automatiquement pour l'appli Iriscope.\n\nÉvénements : DATAtourisme (Licence Ouverte 2.0) et agendas ouverts (${Object.values(extra.bilan).map(b => b.nom).join(', ')}), crédit dans le champ s de chaque événement. Mise à jour : ${index.updated}. ${kept} événements, ${Object.keys(byDept).length} départements, ${index.tiles} tuiles.\n`);
 console.log(`${kept} événements gardés sur ${seen}, ${Object.keys(byDept).length} départements, ${index.tiles} tuiles, ${req} requêtes.`);

@@ -45,7 +45,7 @@ const SOURCES = {
       for (const f of fs.readdirSync(dir)) {
         for (const ev of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')).events || []) {
           const p = (ev.p || []).find(x => (x.e || x.s) >= from && x.s <= to);
-          if (p) out.push({ t: ev.t, d: p.s < from ? from : p.s, lat: ev.lat, lon: ev.lon, cp: ev.cp, k: (ev.k || []).join(' ') });
+          if (p) out.push({ t: ev.t, d: p.s < from ? from : p.s, lat: ev.lat, lon: ev.lon, cp: ev.cp, k: (ev.k || []).join(' '), sub: ev.src || 'dt', subNom: ev.s });
         }
       }
       const idx = JSON.parse(fs.readFileSync(path.join(DONNEES, 'evenements', 'index.json'), 'utf8'));
@@ -104,11 +104,14 @@ for (const [id, s] of Object.entries(SOURCES)) {
 // même événement = même jour, à moins de 400 m, et titres qui commencent pareil (règle de l'appli)
 const km = (a, b, c, d) => Math.hypot((a - c) * 111, (b - d) * 111 * Math.cos(a * Math.PI / 180));
 const tiles = {};
+// les agendas d'appoint arrivent dans les tuiles DATAtourisme : l'appli les traite ensemble (« dt »), le rapport les détaille
+const NOMS = Object.fromEntries(Object.entries(SOURCES).map(([k, s]) => [k, s.nom]));
 for (const [id, list] of Object.entries(data)) {
   for (const e of list) {
     if (JUNK.test(`${e.t} ${e.k || ''}`)) continue; // les ateliers emploi ne comptent pas comme des sorties
     const T = (tiles[tileOf(e.lat, e.lon)] ||= { ev: [], dept: {} });
-    T.ev.push({ src: id, k: norm(e.t).slice(0, 14), d: e.d, lat: e.lat, lon: e.lon });
+    T.ev.push({ src: id, sub: e.sub || id, k: norm(e.t).slice(0, 14), d: e.d, lat: e.lat, lon: e.lon });
+    if (e.sub && e.sub !== id) NOMS[e.sub] = e.subNom || e.sub;
     const dep = String(e.cp || '').match(/^\d{5}$/) ? (/^9[78]/.test(e.cp) ? e.cp.slice(0, 3) : e.cp.slice(0, 2)) : '';
     if (dep) T.dept[dep] = (T.dept[dep] || 0) + 1;
   }
@@ -117,7 +120,7 @@ const decisions = {}, parDept = {};
 for (const [key, T] of Object.entries(tiles)) {
   const byDay = {};
   for (const e of T.ev) (byDay[e.d] ||= []).push(e);
-  const total = {}, propre = {};
+  const total = {}, propre = {}, subT = {}, subP = {};
   for (const list of Object.values(byDay)) {
     const groups = [];
     for (const e of list) {
@@ -128,6 +131,9 @@ for (const [key, T] of Object.entries(tiles)) {
       const srcs = [...new Set(g.map(x => x.src))];
       for (const s of srcs) total[s] = (total[s] || 0) + 1;
       if (srcs.length === 1) propre[srcs[0]] = (propre[srcs[0]] || 0) + 1;
+      const subs = [...new Set(g.map(x => x.sub))];
+      for (const s of subs) subT[s] = (subT[s] || 0) + 1;
+      if (subs.length === 1) subP[subs[0]] = (subP[subs[0]] || 0) + 1;
     }
   }
   const sum = Object.values(total).reduce((a, b) => a + b, 0);
@@ -141,7 +147,7 @@ for (const [key, T] of Object.entries(tiles)) {
   const dep = Object.entries(T.dept).sort((a, b) => b[1] - a[1])[0];
   if (dep) {
     const P = (parDept[dep[0]] ||= { n: {}, propre: {} });
-    for (const s of Object.keys(total)) { P.n[s] = (P.n[s] || 0) + total[s]; P.propre[s] = (P.propre[s] || 0) + (propre[s] || 0); }
+    for (const s of Object.keys(subT)) { P.n[s] = (P.n[s] || 0) + subT[s]; P.propre[s] = (P.propre[s] || 0) + (subP[s] || 0); }
   }
 }
 // une source en incident cette nuit garde les choix de la veille dans les tuiles (pas de bascule sur une seule nuit ratée)
@@ -159,7 +165,9 @@ if (prev && prev.tuiles) {
 const LICENCES_OK = { lov2: 'Licence Ouverte 2.0', 'fr-lo': 'Licence Ouverte 1.0', 'odc-odbl': 'ODbL', 'cc-by': 'CC BY', 'cc-zero': 'CC0', 'odc-pddl': 'PDDL', 'odc-by': 'ODC BY' };
 const SUJET = /agenda|[ée]v[ée]nement|manifestation|que faire|sorties|festival|programmation culturelle/i;
 const DEJA = /open ?agenda|datatourisme|que faire [àa] paris/i;
-let candidats = (prev && prev.candidats) || [];
+// déjà examinés à la main le 15 nov 2026 (branchés dans outils/agendas.mjs, ou écartés : copies d'OpenAgenda, réunions, subventions…)
+const EXAMINES = new Set(['6716ec063f961000352feb1a', '5bd89dae06e3e738f68c0ed0', '6753909b99ad0bf8be9f81a5', '67d2f68c7563a4b5f1cbfe88', '6a46fe3f5417274350b55a32', '6036ea075a1ba9d9847ce5a3', '65fa2a8998d10bcda27ba548', '6847af4bce765ba3a2adfdfe', '5bd89d8406e3e738ef8c0edf', '5b4eeb71b595087c4ad496d9', '62a289f725d01839a4364d8a', '5b4cdb7ca3a729797ae1c365', '6246caf0a789b689c809a787', '6246cb7082bd24b23048c839', '67241b63548043cbbc20e0e3', '6970b6b98239ebec02a4c6d3', '69cb47ccb85ed687042719d4', '5c0a0c4b9ce2e7190ebea585', '5bd89d4406e3e738dd8c0ecb', '536999aaa3a729239d2052d9', '536999aaa3a729239d2052d8', '536999aba3a729239d2052db', '53698ec0a3a729239d20354e', '58ef2d07a3a7293d49c4e17c', '5369a02da3a729239d2062de', '5369a02da3a729239d2062dd', '5369a02da3a729239d2062df', '6763da0a8e03c6a65efb4a70']);
+let candidats = ((prev && prev.candidats) || []).map(c => (EXAMINES.has(c.id) && c.statut === 'à examiner' ? { ...c, statut: 'examiné' } : c));
 if (DISCOVER) {
   const vus = new Set(candidats.map(c => c.id));
   for (const q of ['agenda', 'agenda evenements', 'manifestations', 'que faire', 'evenements culturels', 'agenda sorties']) {
@@ -174,7 +182,7 @@ if (DISCOVER) {
         vus.add(ds.id);
         candidats.push({
           id: ds.id, titre: ds.title, producteur: (ds.organization || {}).name || '', licence: LICENCES_OK[ds.license], formats, page: ds.page,
-          vu: from, statut: DEJA.test(`${ds.title} ${ds.description || ''}`) ? 'déjà couvert (copie d\'OpenAgenda ou de DATAtourisme)' : 'à examiner',
+          vu: from, statut: EXAMINES.has(ds.id) ? 'examiné' : DEJA.test(`${ds.title} ${ds.description || ''}`) ? 'déjà couvert (copie d\'OpenAgenda ou de DATAtourisme)' : 'à examiner',
         });
       }
     } catch (e) { console.log('data.gouv.fr :', e.message); }
@@ -190,8 +198,8 @@ const etat = { version: 1, updated: now.toISOString(), from, to, sources: sante,
 fs.writeFileSync(path.join(OUT, 'sources', 'etat.json'), JSON.stringify(etat));
 const L = [`# Chef des sources : bilan du ${from}`, '', '## Santé des sources', ''];
 for (const s of Object.values(sante)) L.push(`- **${s.nom}** (${s.licence}) : ${s.ok ? `ok, ${s.recus} événements sur 30 jours` : `${s.etat}, ${s.erreur}`}`);
-L.push('', '## Par département (vraies sorties, et entre parenthèses ce que la source est seule à donner)', '', '| Dép. | ' + Object.values(SOURCES).map(s => s.nom).join(' | ') + ' |', '|---|' + Object.keys(SOURCES).map(() => '---|').join(''));
-for (const [dep, P] of Object.entries(parDept).sort()) L.push(`| ${dep} | ` + Object.keys(SOURCES).map(s => P.n[s] ? `${P.n[s]} (${P.propre[s]})` : '·').join(' | ') + ' |');
+L.push('', '## Par département (vraies sorties, et entre parenthèses ce que la source est seule à donner)', '', '| Dép. | ' + Object.values(NOMS).map(n => n.replace(/ \(.*$/, '')).join(' | ') + ' |', '|---|' + Object.keys(NOMS).map(() => '---|').join(''));
+for (const [dep, P] of Object.entries(parDept).sort()) L.push(`| ${dep} | ` + Object.keys(NOMS).map(s => P.n[s] ? `${P.n[s]} (${P.propre[s]})` : '·').join(' | ') + ' |');
 L.push('', `## Nouvelles sources repérées sur data.gouv.fr (${nouveaux.length} cette semaine)`, '');
 for (const c of candidats.filter(c => c.statut === 'à examiner').slice(-50)) L.push(`- ${c.titre} · ${c.producteur} · ${c.licence} · ${c.formats.join('/')} · ${c.page}`);
 fs.writeFileSync(path.join(OUT, 'sources', 'rapport.md'), L.join('\n') + '\n');
