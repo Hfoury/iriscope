@@ -114,3 +114,20 @@ export function nationMatches(text, title) {
   }
   return out;
 }
+
+// Coupes d'Europe des clubs (0.60.0) : mêmes feuilles de match, mais l'équipe est le club en lien ([[Club|nom]]), drapeau retiré
+export function clubOf(v) {
+  const m = String(v || '').match(/\[\[(?:[^\]|]+\|)?([^\]]+)\]\]/);
+  const name = (m ? m[1] : strip(v)).replace(/\s+/g, ' ').trim();
+  return name && name.length <= 40 && !/vainqueur|perdant|\d+e de|qualifi/i.test(name) ? name : null;
+}
+export function clubMatches(text, title) {
+  const out = [];
+  for (const { name, p } of templates(text, IS_MATCH)) {
+    const home = clubOf(p['équipe 1'] || p['équipe1'] || p['team1']), away = clubOf(p['équipe 2'] || p['équipe2'] || p['team2']);
+    const date = dayOf(p.date || '');
+    if (!home || !away || home === away || !date) continue;
+    out.push({ date, time: timeOf(p.heure || ''), home, away, score: scoreOf(p.score || ''), round: strip(p.titre || '').replace(/\s+/g, ' ').trim().slice(0, 80) || title });
+  }
+  return out;
+}

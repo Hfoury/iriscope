@@ -6,7 +6,7 @@
 // Seuls les matchs de 15 jours en arrière à 30 jours en avant sont gardés.
 import fs from 'node:fs';
 import path from 'node:path';
-import { nationMatches } from './nations.mjs';
+import { nationMatches, clubMatches } from './nations.mjs';
 
 const args = process.argv.slice(2);
 const OUT = path.join(args.find(a => !a.startsWith('--')) || 'sortie', 'scores');
@@ -117,6 +117,31 @@ try {
   out.source += ' · Top 14 : Wikipédia (CC BY-SA)';
   console.log(`Top 14 : ${all.length} matchs lus, ${matches.length} gardés, ${matches.filter(m => m.score).length} avec score`);
 } catch (e) { console.log(`Top 14 : échec (${e.message})`); }
+
+// ---------- coupes d'Europe des clubs (Wikipédia, CC BY-SA) : Ligue des champions, Ligue Europa, Ligue Conférence ----------
+// Une feuille de match par rencontre dans les pages « phase de championnat » et « phase à élimination directe » de la saison.
+for (const [k, name, base] of [['uefa.cl', 'Ligue des champions', "Ligue des champions de l'UEFA"], ['uefa.el', 'Ligue Europa', 'Ligue Europa'], ['uefa.ecl', 'Ligue Conférence', 'Ligue Conférence']]) {
+  const lo = new Date(now.getTime() - 15 * 86400000).toISOString().slice(0, 10), hi = new Date(now.getTime() + 30 * 86400000).toISOString().slice(0, 10);
+  const seen = new Map();
+  let pages = 0;
+  for (const part of ['Phase de championnat de la', 'Phase de ligue de la', 'Phase à élimination directe de la']) {
+    const title = `${part} ${base} ${y}-${y + 1}`;
+    try {
+      const raw = await get(`https://fr.wikipedia.org/w/index.php?title=${encodeURIComponent(title.replace(/ /g, '_'))}&action=raw`, false);
+      pages++;
+      for (const m of clubMatches(raw, name)) {
+        if (m.date < lo || m.date > hi) continue;
+        const id = `${k}-${m.date}-${norm(m.home).replace(/ /g, '')}-${norm(m.away).replace(/ /g, '')}`;
+        seen.set(id, { id, ...m });
+      }
+    } catch (e) { /* page absente */ }
+    await new Promise(res => setTimeout(res, 1500));
+  }
+  const matches = [...seen.values()].sort((a, b) => a.date.localeCompare(b.date));
+  if (matches.length) out.leagues.push({ k, name, tz: 'Europe/Paris', matches });
+  console.log(`${name} : ${pages} pages lues, ${matches.length} matchs gardés, ${matches.filter(m => m.score).length} avec score`);
+}
+if (out.leagues.some(l => l.k.startsWith('uefa.'))) out.source += ' · Coupes d\'Europe : Wikipédia (CC BY-SA)';
 
 // ---------- équipes nationales, tous sports (Wikipédia, CC BY-SA) ----------
 // Les pages de l'année (et de la suivante en fin d'année) qui utilisent un modèle de feuille de match sont trouvées par la recherche
