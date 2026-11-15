@@ -38,6 +38,8 @@ async function walk(cat, depth) {
       const lic = strip(m.LicenseShortName && m.LicenseShortName.value);
       if (!OK_LIC.test(lic) || /\b(nc|nd)\b/i.test(lic) || (m.NonFree && m.NonFree.value === 'true')) continue;
       if (ii.width < 1600 || ii.height < 900) continue;
+      // pas de panoramas (recadrés sur un téléphone en hauteur, ils ne ressemblent à rien)
+      if (ii.width / ii.height > 2.1 || ii.width / ii.height < 1.1) continue;
       const artist = strip(m.Artist && m.Artist.value).slice(0, 60) || 'Auteur sur Wikimedia Commons';
       photos.set(pg.title, { u: ii.thumburl, w: ii.thumbwidth, h: ii.thumbheight, a: artist, l: lic, p: ii.descriptionshorturl || ii.descriptionurl, t: strip(m.ObjectName && m.ObjectName.value).slice(0, 80) || pg.title.replace(/^File:|\.[a-z]+$/gi, '') });
       if (photos.size >= cap) break;
