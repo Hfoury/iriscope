@@ -1,7 +1,8 @@
 // Compteurs des sorties Iriscope : regroupe toutes les 3 heures les « ça m'intéresse » et « j'y vais » envoyés
 // sur le sujet ntfy public (gardés 12 h par ntfy) dans un fichier durable, publié sur la branche « compteurs »
 // (compteurs/index.json) et lu par l'appli.
-// Anonyme : seulement une clé de sortie, un choix (i, g ou -) et un identifiant d'appareil tiré au hasard.
+// Anonyme : seulement une clé de sortie, un choix (i = ça m'intéresse, g = j'y vais, x = annulé ou information
+// fausse, - = retrait) et un identifiant d'appareil tiré au hasard.
 // Un seul choix par appareil et par sortie (le plus récent remplace l'ancien). Les sorties terminées depuis
 // plus de 120 jours sont oubliées.
 // Usage : node outils/compteurs.mjs sortie [--ancien ancien-index.json]
@@ -28,7 +29,7 @@ for (const line of lines) {
   b.d = b.d || {}; b.at = b.at || {};
   if ((b.at[dev] || 0) > t) continue; // un message plus récent a déjà été pris en compte
   b.at[dev] = t;
-  if (r.a === 'i' || r.a === 'g') b.d[dev] = r.a; else delete b.d[dev];
+  if (r.a === 'i' || r.a === 'g' || r.a === 'x') b.d[dev] = r.a; else delete b.d[dev];
   if (r.u) b.u = String(r.u).slice(0, 10);
   added++;
 }
@@ -38,10 +39,11 @@ for (const [k, b] of Object.entries(idx.items)) {
   const vals = Object.values(b.d || {});
   b.g = vals.filter(x => x === 'g').length;
   b.i = vals.filter(x => x === 'i').length;
+  b.x = vals.filter(x => x === 'x').length; // signalements « annulé ou information fausse »
   if (!vals.length || (b.u && b.u < limite)) delete idx.items[k];
 }
 idx.updated = new Date().toISOString();
 fs.mkdirSync(OUT, { recursive: true });
 fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(idx));
 const tot = Object.values(idx.items);
-console.log(`${lines.length} messages lus, ${added} choix pris en compte ; ${tot.length} sorties suivies, ${tot.reduce((s, b) => s + b.g, 0)} « j'y vais » et ${tot.reduce((s, b) => s + b.i, 0)} « ça m'intéresse »`);
+console.log(`${lines.length} messages lus, ${added} choix pris en compte ; ${tot.length} sorties suivies, ${tot.reduce((s, b) => s + b.g, 0)} « j'y vais » et ${tot.reduce((s, b) => s + b.i, 0)} « ça m'intéresse », ${tot.reduce((s, b) => s + (b.x || 0), 0)} signalements`);
