@@ -131,7 +131,7 @@ try {
       try {
         const r = await get(`https://fr.wikipedia.org/w/api.php?action=query&list=search&format=json&srnamespace=0&srlimit=100&sroffset=${off}&srsearch=${encodeURIComponent(q)}`);
         const hits = (r.query && r.query.search) || [];
-        hits.forEach(h => { if (!/moins de \d+ ans|U-?\d{2}\b|universitaire|jeunesse|junior|espoirs|scolaire/i.test(h.title)) titles.add(h.title); });
+        hits.forEach(h => { if (!/moins de \d+ ans|U-?\d{2}\b|universitaire|jeunesse|junior|espoirs|scolaire|futsal|beach|de plage|^saison /i.test(h.title)) titles.add(h.title); });
         if (hits.length < 100) break;
       } catch (e) { console.log(`Recherche « ${q} » : échec (${e.message})`); break; }
       await new Promise(res => setTimeout(res, 300));

@@ -56,12 +56,15 @@ const SPORT_WORDS = /\s+(football|rugby|rugby à xv|rugby à 7|hbf|hbm|handball|
 export function team(v) {
   if (!v) return null;
   const s = v.replace(/'''/g, '').replace(/<[^>]+>/g, '').trim();
+  // un drapeau suivi d'un lien ({{NOR-d}} [[Bodø/Glimt]]) est un club, pas une sélection
+  if (/\[\[/.test(s.replace(/\{\{[^{}]*\}\}/g, ''))) return null;
   const m = s.match(/\{\{([^|}]+)/);
   if (!m) return null;
   let n = m[1].trim();
   // équipes de jeunes, espoirs, réserves : pas les sélections A
   if (/\b(U\s?-?\d{2}|moins de|espoirs|juniors?|jeunes|universitaire|militaire|B)\b/i.test(n) || /moins de \d+ ans|U-?\d{2}\b/i.test(s)) return null;
-  const code = n.match(/^([A-Z]{3})(?:\s|-|$)/);
+  // {{FRA football}}, {{TUR football|d}} : le code doit être suivi du sport ({{FRA-d}} seul n'est qu'un drapeau)
+  const code = n.match(/^([A-Z]{3})\s+(football|rugby|handball|basket|volley|hockey)/i);
   if (code) return CODES[code[1]] || null;
   if (/^(lien|date|heure|nobr|small|petit|sp|cap|drapeau|drapeaux)$/i.test(n)) return null;
   let prev; do { prev = n; n = n.replace(SPORT_WORDS, ''); } while (n !== prev);
