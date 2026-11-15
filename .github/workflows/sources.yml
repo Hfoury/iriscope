@@ -1,0 +1,58 @@
+name: Chef des sources
+
+# Chaque nuit, après la collecte DATAtourisme : note les sources d'événements tuile par tuile, repère ce que chacune
+# apporte en propre, surveille les pannes, et publie ses choix sur la branche « sources » (lue par l'appli).
+# Le lundi : cherche aussi de nouveaux agendas ouverts sur data.gouv.fr et ouvre un ticket s'il en trouve.
+# Gratuit, sans clé, ne publie que des données.
+on:
+  schedule:
+    - cron: '40 3 * * *'
+  workflow_dispatch:
+    inputs:
+      decouverte:
+        description: 'Chercher aussi de nouvelles sources sur data.gouv.fr'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: sources
+  cancel-in-progress: true
+
+jobs:
+  sources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: donnees
+          path: donnees
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Etat de la veille
+        run: curl -sfL -o ancien.json "https://raw.githubusercontent.com/${{ github.repository }}/sources/sources/etat.json" || echo '{}' > ancien.json
+      - name: Notation
+        run: node outils/sources.mjs sortie donnees ancien.json ${{ github.event.inputs.decouverte == 'true' && '--decouverte' || '' }}
+      - name: Publication sur la branche sources
+        run: |
+          cp sortie/nouveaux.md nouveaux.md && rm sortie/nouveaux.md
+          cd sortie
+          git init -q -b sources
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Bilan des sources du $(date -u +%F)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" sources
+      - name: Ticket si nouvelles sources
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -s nouveaux.md ]; then
+            gh issue create -R "${{ github.repository }}" --title "Nouvelles sources d'événements repérées ($(date -u +%F))" --body-file nouveaux.md
+          fi
