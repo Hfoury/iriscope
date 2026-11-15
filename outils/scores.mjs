@@ -6,6 +6,7 @@
 // Seuls les matchs de 15 jours en arrière à 30 jours en avant sont gardés.
 import fs from 'node:fs';
 import path from 'node:path';
+import { nationMatches } from './nations.mjs';
 
 const args = process.argv.slice(2);
 const OUT = path.join(args.find(a => !a.startsWith('--')) || 'sortie', 'scores');
@@ -116,6 +117,54 @@ try {
   out.source += ' · Top 14 : Wikipédia (CC BY-SA)';
   console.log(`Top 14 : ${all.length} matchs lus, ${matches.length} gardés, ${matches.filter(m => m.score).length} avec score`);
 } catch (e) { console.log(`Top 14 : échec (${e.message})`); }
+
+// ---------- équipes nationales, tous sports (Wikipédia, CC BY-SA) ----------
+// Les pages de l'année (et de la suivante en fin d'année) qui utilisent un modèle de feuille de match sont trouvées par la recherche
+// de Wikipédia ; on n'y garde que les rencontres entre deux sélections A (hommes et femmes), de 15 jours en arrière à 30 jours en avant.
+try {
+  const TPL = ['Feuille de match', 'Feuille de match handball', 'Feuille de match rugby à XV', 'Match rugby', 'Feuille de match basket-ball', 'Feuille de match basketball', 'Basketballbox', 'Feuille de match volley-ball', 'Feuille de match hockey sur glace'];
+  const years = [now.getFullYear(), ...(now.getMonth() >= 9 ? [now.getFullYear() + 1] : []), ...(now.getMonth() <= 1 ? [now.getFullYear() - 1] : [])];
+  const titles = new Set();
+  for (const t of TPL) for (const yy of years) {
+    for (let off = 0; off < 300; off += 100) {
+      const q = `hastemplate:"${t}" intitle:${yy}`;
+      try {
+        const r = await get(`https://fr.wikipedia.org/w/api.php?action=query&list=search&format=json&srnamespace=0&srlimit=100&sroffset=${off}&srsearch=${encodeURIComponent(q)}`);
+        const hits = (r.query && r.query.search) || [];
+        hits.forEach(h => { if (!/moins de \d+ ans|U-?\d{2}\b|universitaire|jeunesse|junior|espoirs|scolaire/i.test(h.title)) titles.add(h.title); });
+        if (hits.length < 100) break;
+      } catch (e) { console.log(`Recherche « ${q} » : échec (${e.message})`); break; }
+      await new Promise(res => setTimeout(res, 300));
+    }
+  }
+  const lo = new Date(now.getTime() - 15 * 86400000).toISOString().slice(0, 10), hi = new Date(now.getTime() + 30 * 86400000).toISOString().slice(0, 10);
+  const seen = new Map();
+  let pages = 0;
+  for (const title of titles) {
+    try {
+      const raw = await get(`https://fr.wikipedia.org/w/index.php?title=${encodeURIComponent(title)}&action=raw`, false);
+      pages++;
+      for (const m of nationMatches(raw, title)) {
+        if (m.date < lo || m.date > hi) continue;
+        const sfx = m.women ? ' (F)' : '';
+        const id = `nat-${m.sport}${m.women ? 'f' : ''}-${m.date}-${norm(m.home).replace(/ /g, '')}-${norm(m.away).replace(/ /g, '')}`;
+        const old = seen.get(id);
+        // la même rencontre peut figurer sur la page de la compétition et sur celle d'une équipe : on garde le score et l'heure connus
+        const x = { id, date: m.date, time: m.time || (old && old.time) || null, home: m.home + sfx, away: m.away + sfx, score: m.score || (old && old.score) || null, round: (old && old.round) || m.round, sport: m.sport };
+        seen.set(id, x);
+      }
+    } catch (e) { console.log(`${title} : échec (${e.message})`); }
+    await new Promise(res => setTimeout(res, 250));
+  }
+  const NAMES = { foot: '🌍 Sélections ⚽', rugby: '🌍 Sélections 🏉', hand: '🌍 Sélections 🤾', basket: '🌍 Sélections 🏀', volley: '🌍 Sélections 🏐', hockey: '🌍 Sélections 🏒' };
+  for (const [sp, name] of Object.entries(NAMES)) {
+    const matches = [...seen.values()].filter(m => m.sport === sp).map(({ sport, ...m }) => m).sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
+    if (matches.length) out.leagues.push({ k: `nat.${sp}`, name, tz: 'Europe/Paris', sport: sp, matches });
+    console.log(`${name} : ${matches.length} matchs, ${matches.filter(m => m.score).length} avec score`);
+  }
+  out.source += ' · Sélections nationales : Wikipédia (CC BY-SA)';
+  console.log(`Sélections : ${titles.size} pages trouvées, ${pages} lues`);
+} catch (e) { console.log(`Sélections : échec (${e.message})`); }
 
 // ---------- EuroMillions : dernier tirage publié par la loterie nationale britannique (mêmes numéros dans tous les pays) ----------
 // L'adresse ne donne que le dernier tirage : on l'ajoute à ceux déjà publiés sur la branche « scores ».
