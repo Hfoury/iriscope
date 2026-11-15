@@ -1,12 +1,14 @@
-// Diagnostic manuel (0.42.1) : ce que renvoie VigiEau pour quelques communes. N'écrit rien.
-const UA = 'Mozilla/5.0 (Linux; Android 14) diagnostic/1.0';
-for (const [n, lon, lat, c] of [['Rennes', -1.68, 48.111, '35238'], ['Chateauneuf-du-Faou', -3.818, 48.188, '29027'], ['Troyes', 4.074, 48.297, '10387']]) {
+// Diagnostic manuel (15 nov 2026) : schéma, licence et taille des agendas repérés par le chef des sources. N'écrit rien.
+const UA = 'iriscope-sources/1.0 (+https://github.com/Hfoury/iriscope)';
+const L = ['data.iledefrance.fr/ile-de-france-nature-animations', 'data.paysdelaloire.fr/agenda-culture-de-la-region-des-pays-de-la-loire', 'data.cc-autourdechenonceaux.fr/attractivite-intramuros-api-agenda', 'data.laregion.fr/lagenda-des-maisons-de-la-region', 'data.nantesmetropole.fr/244400404_agenda-evenements-nantes-metropole_v2', 'data.laregion.fr/agenda-d-occitanie-musees', 'data.laregion.fr/agendas-participatif-des-sorties-en-occitanie', 'data.meudon.fr/agenda-de-la-ville-de-meudon-copie', 'opendata.isere.fr/agenda-musee-dep', 'opendata.clermontmetropole.eu/agenda-vcf', 'data.nantesmetropole.fr/244400404_agenda-animations-culturelles-bibliotheque-municipale-nantes', 'data.paysdelaloire.fr/234400034_070-002_offre-touristique-fetes_et_manifestations-rpdl'];
+for (const u of L) {
+  const [h, ...r] = u.split('/'); const d = r.join('/');
   try {
-    const r = await fetch(`https://api.vigieau.gouv.fr/api/zones?lon=${lon}&lat=${lat}&commune=${c}&profil=particulier`, { headers: { 'User-Agent': UA } });
-    const t = await r.text();
-    console.log(`== ${n} HTTP ${r.status} ${t.length} car.`);
-    let j; try { j = JSON.parse(t); } catch (e) { console.log(t.slice(0, 300)); continue; }
-    const list = Array.isArray(j) ? j : [j];
-    for (const z of list) console.log(JSON.stringify({ id: z.id, nom: z.nom, type: z.type, niveauGravite: z.niveauGravite, keys: Object.keys(z).join(','), arrete: z.arrete && { debut: z.arrete.dateDebutValidite, fin: z.arrete.dateFinValidite } }));
-  } catch (e) { console.log(n, 'erreur', e.message); }
+    const j = await (await fetch(`https://${h}/api/explore/v2.1/catalog/datasets/${d}`, { headers: { 'User-Agent': UA } })).json();
+    const m = (j.metas && j.metas.default) || {};
+    console.log(`== ${d} n=${m.records_count} licence=${m.license} maj=${m.data_processed || m.modified}`);
+    console.log('  champs :', (j.fields || []).map(f => `${f.name}:${f.type}`).join(' '));
+    const s = await (await fetch(`https://${h}/api/explore/v2.1/catalog/datasets/${d}/records?limit=1`, { headers: { 'User-Agent': UA } })).json();
+    console.log('  exemple :', JSON.stringify((s.results || [])[0] || s).slice(0, 900));
+  } catch (e) { console.log(`== ${d} erreur ${e.message}`); }
 }
