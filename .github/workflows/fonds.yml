@@ -24,6 +24,8 @@ jobs:
         with:
           node-version: 22
       - name: Liste des photos
+        env:
+          FLICKR_KEY: ${{ secrets.FLICKR_KEY }}
         run: node outils/fonds.mjs sortie
       - name: Publication sur la branche fonds
         run: |

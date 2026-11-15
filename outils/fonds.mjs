@@ -46,7 +46,32 @@ async function walk(cat, depth) {
   if (depth > 0) for (const s of subs) await walk(s, depth - 1);
 }
 for (const r of ROOTS) { await walk(r, DEPTH).catch(e => console.log('⚠️', r, e.message)); console.log(r, '→', photos.size, 'photos au total'); }
+// Flickr (si le secret FLICKR_KEY existe) : licences libres réutilisables commercialement seulement
+// 4 = CC BY 2.0, 5 = CC BY-SA 2.0, 9 = CC0, 10 = marque du domaine public ; jamais NC ni ND
+const FLICKR_KEY = process.env.FLICKR_KEY || '';
+const FL_LIC = { 4: 'CC BY 2.0', 5: 'CC BY-SA 2.0', 9: 'CC0', 10: 'Domaine public' };
+if (FLICKR_KEY) {
+  let n = 0;
+  const FR = '-5.3,41.3,9.7,51.2'; // France métropolitaine
+  for (const [q, bbox] of [['paysage', FR], ['landscape', FR], ['mer', FR], ['montagne', FR], ['landscape', ''], ['seascape', ''], ['mountains', '']]) {
+    for (let page = 1; page <= 3; page++) {
+      const u = 'https://api.flickr.com/services/rest/?' + new URLSearchParams({ method: 'flickr.photos.search', api_key: FLICKR_KEY, format: 'json', nojsoncallback: '1',
+        text: q, license: '4,5,9,10', content_type: '1', media: 'photos', safe_search: '1', sort: 'interestingness-desc', per_page: '250', page: String(page),
+        extras: 'owner_name,license,url_l,o_dims', ...(bbox ? { bbox } : {}) });
+      const j = await fetch(u, { headers: { 'User-Agent': UA } }).then(r => r.json()).catch(() => null);
+      if (!j || j.stat !== 'ok') { console.log('⚠️ Flickr :', j && j.message); break; }
+      for (const x of j.photos.photo || []) {
+        if (!x.url_l || !FL_LIC[x.license] || Number(x.width_l) < 1000) continue;
+        const k = 'flickr:' + x.id; if (photos.has(k)) continue;
+        photos.set(k, { u: x.url_l, w: Number(x.width_l), h: Number(x.height_l), a: String(x.ownername || 'Photographe Flickr').slice(0, 60), l: FL_LIC[x.license], p: `https://www.flickr.com/photos/${x.owner}/${x.id}`, t: String(x.title || '').slice(0, 80), s: 'Flickr' });
+        n++;
+      }
+      await sleep(1100);
+    }
+  }
+  console.log('Flickr →', n, 'photos');
+}
 if (photos.size < 100) { console.log('Trop peu de photos, on garde la liste précédente'); process.exit(1); }
 fs.mkdirSync(OUT + '/fonds', { recursive: true });
-fs.writeFileSync(OUT + '/fonds/index.json', JSON.stringify({ at: new Date().toISOString(), source: 'Wikimedia Commons, images remarquables', photos: [...photos.values()] }));
+fs.writeFileSync(OUT + '/fonds/index.json', JSON.stringify({ at: new Date().toISOString(), source: 'Wikimedia Commons (images remarquables) et Flickr (licences libres)', photos: [...photos.values()] }));
 console.log('Écrit :', photos.size, 'photos,', fs.statSync(OUT + '/fonds/index.json').size, 'octets');
