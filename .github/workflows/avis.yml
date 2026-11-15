@@ -1,6 +1,6 @@
 name: Avis de la communauté
 
-# Toutes les 3 heures : regroupe les avis (étoiles et commentaires) envoyés depuis l'appli et les publie sur la branche « avis ».
+# Toutes les 3 heures : regroupe les avis (étoiles et commentaires) et les événements proposés envoyés depuis l'appli, et les publie sur la branche « avis ».
 # Gratuit, sans clé. Les messages ntfy ne sont gardés que 12 heures : ce passage régulier les rend durables.
 on:
   schedule:
@@ -25,9 +25,12 @@ jobs:
           node-version: 22
       - name: Avis déjà regroupés
         run: |
-          if git fetch -q --depth=1 origin avis 2>/dev/null; then git show FETCH_HEAD:avis/index.json > ancien.json || echo '{}' > ancien.json; else echo '{}' > ancien.json; fi
+          if git fetch -q --depth=1 origin avis 2>/dev/null; then git show FETCH_HEAD:avis/index.json > ancien.json || echo '{}' > ancien.json; git show FETCH_HEAD:avis/propositions.json > anciennes-propositions.json || echo '{}' > anciennes-propositions.json; else echo '{}' > ancien.json; echo '{}' > anciennes-propositions.json; fi
       - name: Regroupement
         run: node outils/avis.mjs sortie --ancien ancien.json
+      # 0.57.0 : événements proposés par les utilisateurs, publiés au même endroit (avis/propositions.json)
+      - name: Événements proposés
+        run: node outils/propositions.mjs sortie --ancien anciennes-propositions.json
       - name: Publication sur la branche avis
         run: |
           cd sortie
