@@ -32,7 +32,7 @@ for (const line of lines) {
   const old = b.list.find(x => x.id === rid);
   const t = Number(r.t) || m.time * 1000;
   if (old && old.t >= t) continue;
-  b.list = [{ id: rid, s: Math.round(r.s), c: String(r.c || '').replace(/\s+/g, ' ').trim().slice(0, 280), n: String(r.n || '').trim().slice(0, 30), t, d: dev }, ...b.list.filter(x => x.id !== rid)].slice(0, 200);
+  b.list = [{ id: rid, s: Math.round(r.s), c: String(r.c || '').replace(/\s+/g, ' ').trim().slice(0, 280), n: String(r.n || '').trim().slice(0, 30), t, d: dev, ...(r.p >= 1 && r.p <= 3 ? { p: Math.round(r.p) } : {}) }, ...b.list.filter(x => x.id !== rid)].slice(0, 200);
   if (r.ti) idx.titles[key] = String(r.ti).slice(0, 80);
   added++;
 }
@@ -40,6 +40,8 @@ for (const [k, b] of Object.entries(idx.items)) {
   b.list = b.list.filter(x => !hidden.has(x.id)).sort((x, y) => y.t - x.t);
   if (!b.list.length) { delete idx.items[k]; continue; }
   b.n = b.list.length; b.avg = Math.round(b.list.reduce((s, x) => s + x.s, 0) / b.n * 10) / 10;
+  // 0.55.0 : prix ressenti (1 à 3) des bonnes adresses
+  const ps = b.list.filter(x => x.p); if (ps.length) b.pr = Math.round(ps.reduce((s, x) => s + x.p, 0) / ps.length * 10) / 10; else delete b.pr;
 }
 idx.hidden = [...hidden];
 idx.updated = new Date().toISOString();
