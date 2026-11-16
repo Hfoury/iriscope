@@ -1,10 +1,10 @@
 name: Avis de la communauté
 
-# Toutes les 3 heures : regroupe les avis (étoiles et commentaires) et les événements proposés envoyés depuis l'appli, et les publie sur la branche « avis ».
+# Toutes les heures (0.60.0, à cause des photos que ntfy ne garde que 3 h) : regroupe les avis (étoiles et commentaires) et les événements proposés envoyés depuis l'appli, et les publie sur la branche « avis ».
 # Gratuit, sans clé. Les messages ntfy ne sont gardés que 12 heures : ce passage régulier les rend durables.
 on:
   schedule:
-    - cron: '17 */3 * * *'
+    - cron: '17 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -17,7 +17,7 @@ concurrency:
 jobs:
   avis:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,12 +25,17 @@ jobs:
           node-version: 22
       - name: Avis déjà regroupés
         run: |
-          if git fetch -q --depth=1 origin avis 2>/dev/null; then git show FETCH_HEAD:avis/index.json > ancien.json || echo '{}' > ancien.json; git show FETCH_HEAD:avis/propositions.json > anciennes-propositions.json || echo '{}' > anciennes-propositions.json; else echo '{}' > ancien.json; echo '{}' > anciennes-propositions.json; fi
+          if git fetch -q --depth=1 origin avis 2>/dev/null; then git show FETCH_HEAD:avis/index.json > ancien.json || echo '{}' > ancien.json; git show FETCH_HEAD:avis/propositions.json > anciennes-propositions.json || echo '{}' > anciennes-propositions.json; git show FETCH_HEAD:avis/photos.json > anciennes-photos.json || echo '{}' > anciennes-photos.json; mkdir -p anciennes-photos; git archive FETCH_HEAD avis/photos 2>/dev/null | tar -x -C anciennes-photos --strip-components=2 || true; else echo '{}' > ancien.json; echo '{}' > anciennes-propositions.json; echo '{}' > anciennes-photos.json; fi
       - name: Regroupement
         run: node outils/avis.mjs sortie --ancien ancien.json
       # 0.57.0 : événements proposés par les utilisateurs, publiés au même endroit (avis/propositions.json)
       - name: Événements proposés
         run: node outils/propositions.mjs sortie --ancien anciennes-propositions.json
+      # 0.60.0 : photos et mots des IriScopien(ne)s, triés avant publication (nudité, texte écrit sur la photo, numéros, insultes, politique)
+      - name: Outils de tri des photos
+        run: mkdir -p /tmp/tri && cd /tmp/tri && npm init -y > /dev/null && npm i --no-audit --no-fund sharp@0.34 nsfwjs@4 @tensorflow/tfjs@4 tesseract.js@5 > /dev/null && ln -s /tmp/tri/node_modules "$GITHUB_WORKSPACE/node_modules"
+      - name: Photos des IriScopien(ne)s
+        run: node outils/photos.mjs sortie --ancien anciennes-photos.json --dossier-photos anciennes-photos || { echo "Tri des photos en échec : on garde les photos déjà publiées"; mkdir -p sortie/avis/photos; cp anciennes-photos.json sortie/avis/photos.json; cp -r anciennes-photos/. sortie/avis/photos/ 2>/dev/null || true; }
       - name: Publication sur la branche avis
         run: |
           cd sortie
