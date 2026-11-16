@@ -90,6 +90,12 @@ async function judgePhoto(buf) {
   return { jpg };
 }
 
+// essai à la demande (lancement manuel du workflow) : trois images fabriquées, pour vérifier que les outils de tri répondent
+if (args.includes('--essai')) {
+  const sh = (await import('sharp')).default;
+  const mk = txt => sh(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600"><rect width="900" height="600" fill="#bde"/><text x="40" y="320" font-size="64" font-family="DejaVu Sans" fill="#111">${txt}</text></svg>`)).jpeg().toBuffer();
+  for (const txt of ['Fête du village', 'Tél 06 12 34 56 78', 'Votez Macron']) { const v = await judgePhoto(await mk(txt)); console.log(`Essai « ${txt} » : ${v.why || (v.wait ? 'en attente (lecture du texte indisponible)' : 'acceptée')}`); }
+}
 let ok = 0, ko = 0;
 for (const [id, p] of pending) {
   const r = p.meta;

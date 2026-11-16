@@ -36,7 +36,7 @@ jobs:
         run: mkdir -p /tmp/tri && cd /tmp/tri && npm init -y > /dev/null && npm i --no-audit --no-fund sharp@0.34 nsfwjs@4 @tensorflow/tfjs@4 tesseract.js@5 > /dev/null && ln -s /tmp/tri/node_modules "$GITHUB_WORKSPACE/node_modules"
       - name: Photos des IriScopien(ne)s
         run: |
-          node outils/photos.mjs sortie --ancien anciennes-photos.json --dossier-photos anciennes-photos || {
+          node outils/photos.mjs sortie --ancien anciennes-photos.json --dossier-photos anciennes-photos ${{ github.event_name == 'workflow_dispatch' && '--essai' || '' }} || {
             echo "Tri des photos en échec, on garde les photos déjà publiées"
             mkdir -p sortie/avis/photos; cp anciennes-photos.json sortie/avis/photos.json; cp -r anciennes-photos/. sortie/avis/photos/ 2>/dev/null || true
           }
