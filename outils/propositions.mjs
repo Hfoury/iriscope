@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { checkText } from './moderation.mjs';
 
 const TOPIC = 'iriscope-propositions-7d3a91c4b2e6';
 const args = process.argv.slice(2);
@@ -39,9 +40,11 @@ for (const line of lines) {
   const old = map.get(e.id);
   const t = Number(r.t) || m.time * 1000;
   if (old || removed.has(e.id)) continue;
+  // 0.60.0 : même filtre que les photos (numéros même déguisés, liens, insultes, politique) ; l'appli refuse déjà avant l'envoi
+  if (![[e.title, 90], [e.description, 300]].every(([x, n]) => checkText(clean(x, n), n).ok)) continue;
   map.set(e.id, { id: clean(e.id, 40), title: clean(e.title, 90), start: clean(e.start, 25), end: clean(e.end, 25), place: clean(e.place, 90), city: clean(e.city, 60),
     lat: Math.round(Number(e.lat) * 1e4) / 1e4, lon: Math.round(Number(e.lon) * 1e4) / 1e4, description: clean(e.description, 300), category: clean(e.category, 40),
-    free: !!e.free, by: clean(e.by, 30), h, t });
+    free: !!e.free, by: clean(e.by, 30), h, t, ...(/^[0-9a-f]{32}$/.test(e.hv || '') ? { hv: e.hv } : {}) });
   added++;
 }
 const limit = Date.now() - 86400000;

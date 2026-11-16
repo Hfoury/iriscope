@@ -8,6 +8,7 @@
 // Ce qui est refusé : seulement l'identifiant et la raison (7 jours), pour que l'auteur sache pourquoi.
 // Signalée par 3 téléphones différents : masquée et effacée. L'auteur la retire avec son secret ; le responsable avec sa phrase
 // secrète (seule son empreinte est dans outils/admin-photos.txt). Tout est oublié au bout de 120 jours.
+// Visuel d'un événement proposé (org, 0.60.0) : même tri ; pv = preuve tirée du secret de l'auteur, dont l'empreinte (hv) est dans l'événement.
 // Usage : node outils/photos.mjs sortie --ancien ancien-photos.json --dossier-photos anciennes-photos
 import fs from 'node:fs';
 import path from 'node:path';
@@ -53,6 +54,7 @@ for (const line of lines) {
   const id = clean(r.id, 40);
   if (!/^[a-z0-9]{8,40}$/.test(id) || !/^e:/.test(r.k || '') || !/^[0-9a-f]{32}$/.test(r.h || '')) continue;
   if (items.has(id) || refused.has(id) || removed.has(id) || hidden.has(id)) continue;
+  if (r.org && !/^[0-9a-f]{32}$/.test(r.pv || '')) continue;
   const p = pending.get(id) || { meta: r, t: m.time * 1000, files: [] };
   if (m.attachment && m.attachment.url && Number.isInteger(r.i) && r.i >= 0 && r.i < 2) p.files.push({ i: r.i, url: m.attachment.url, size: m.attachment.size || 0 });
   pending.set(id, p);
@@ -103,8 +105,10 @@ for (const [id, p] of pending) {
   if (files.length < (Number(r.n) || 0)) continue; // la 2e photo n'est pas encore arrivée : prochain passage
   const c = clean(r.c, 200);
   let why = null;
+  // visuel d'un événement proposé : une seule preuve (pv) par événement ; l'appli vérifie qu'elle correspond à l'événement
+  if (r.org && [...items.values()].some(e => e.pv === r.pv)) why = 'Visuel déjà publié pour cet événement';
   const chk = checkText(c);
-  if (!chk.ok) why = chk.why;
+  if (!why && !chk.ok) why = chk.why;
   const saved = [];
   for (const f of why ? [] : files) {
     try {
@@ -121,7 +125,7 @@ for (const [id, p] of pending) {
   if (!why && !saved.length && !c) why = 'Envoi vide';
   if (why === 'wait') { for (const n of saved) fs.rmSync(path.join(PH, n), { force: true }); continue; }
   if (why) { for (const n of saved) fs.rmSync(path.join(PH, n), { force: true }); refused.set(id, { id, why, t: p.t }); ko++; continue; }
-  items.set(id, { id, k: clean(r.k, 80), title: clean(r.title, 90), by: clean(r.by, 30), c, files: saved, h: r.h, t: p.t });
+  items.set(id, { id, k: clean(r.k, 80), title: clean(r.title, 90), by: clean(r.by, 30), c, files: saved, h: r.h, t: p.t, ...(r.org ? { org: 1, pv: r.pv } : {}) });
   ok++;
 }
 if (ocr) await ocr.terminate();
