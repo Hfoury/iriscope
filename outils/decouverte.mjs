@@ -57,11 +57,13 @@ for (const v of Object.values(vus)) if (v.r && v.r.licence && !OPEN_LIC.test(v.r
 // ordre : préfectures, puis intercos, puis mairies ; jamais vus d'abord, puis les plus anciens ; quarantaine revue au bout de 7 jours
 // mairies et intercos d'abord (ce sont elles qui publient les sorties) ; préfectures ensuite (alertes, pas d'agenda de sorties)
 const rank = { interco: 0, mairie: 1, 'préfecture': 2 };
+// 21 nov (Hervé) : l'outre-mer d'abord, c'est là que les sources ouvertes manquent le plus
+const outreMer = ed => /^9[78]/.test(String(ed.insee || '')) ? 0 : 1;
 const todo = [...bySite.entries()].filter(([h]) => {
   const v = vus[h]; if (!v) return true;
   const age = now - Date.parse(v.t);
   return age > (v.r && v.r.q ? 7 * 86400000 : REVISIT);
-}).sort((a, b) => (vus[a[0]] ? 1 : 0) - (vus[b[0]] ? 1 : 0) || rank[a[1].type] - rank[b[1].type] || String((vus[a[0]] || {}).t || '').localeCompare(String((vus[b[0]] || {}).t || '')))
+}).sort((a, b) => (vus[a[0]] ? 1 : 0) - (vus[b[0]] ? 1 : 0) || outreMer(a[1]) - outreMer(b[1]) || rank[a[1].type] - rank[b[1].type] || String((vus[a[0]] || {}).t || '').localeCompare(String((vus[b[0]] || {}).t || '')))
   .slice(0, MAX);
 console.log(`${todo.length} sites à visiter cette nuit (max ${MAX}).`);
 
