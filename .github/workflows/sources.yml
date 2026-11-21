@@ -13,6 +13,13 @@ on:
         description: 'Chercher aussi de nouvelles sources sur data.gouv.fr'
         type: boolean
         default: true
+      max:
+        description: 'Nombre de sites publics à visiter'
+        default: '400'
+      europe:
+        description: 'Chercher aussi en Europe (data.europa.eu)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -25,7 +32,7 @@ concurrency:
 jobs:
   sources:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -39,6 +46,15 @@ jobs:
         run: curl -sfL -o ancien.json "https://raw.githubusercontent.com/${{ github.repository }}/sources/sources/etat.json" || echo '{}' > ancien.json
       - name: Notation
         run: node outils/sources.mjs sortie donnees ancien.json ${{ github.event.inputs.decouverte == 'true' && '--decouverte' || '' }}
+      # 21 nov 2026 : découverte automatique depuis l'annuaire officiel (sites des mairies, intercos, préfectures) et data.europa.eu
+      - name: Decouverte des agendas publics
+        continue-on-error: true
+        run: |
+          curl -sfL -o ancien-decouverte.json "https://raw.githubusercontent.com/${{ github.repository }}/sources/sources/decouverte.json" || echo '{}' > ancien-decouverte.json
+          curl -sfL -o /tmp/annuaire.tar.bz2 https://lecomarquage.service-public.gouv.fr/donnees_locales_v4/all_latest.tar.bz2
+          mkdir -p /tmp/annuaire && tar xjf /tmp/annuaire.tar.bz2 -C /tmp/annuaire --wildcards '*local.json'
+          node outils/decouverte.mjs "$(ls /tmp/annuaire/*local.json | head -n 1)" sortie ancien-decouverte.json --max=${{ github.event.inputs.max || '400' }} ${{ github.event.inputs.europe == 'true' && '--europe' || '' }}
+          cat sortie/sources/decouverte.md >> sortie/sources/rapport.md
       - name: Publication sur la branche sources
         run: |
           cp sortie/nouveaux.md nouveaux.md && rm sortie/nouveaux.md
