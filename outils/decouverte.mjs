@@ -67,9 +67,13 @@ for (const v of Object.values(vus)) if (v.r && v.r.licence && !OPEN_LIC.test(v.r
 // mairies et intercos d'abord (ce sont elles qui publient les sorties) ; préfectures ensuite (alertes, pas d'agenda de sorties)
 const rank = { interco: 0, mairie: 1, 'préfecture': 2 };
 // 21 nov (Hervé) : l'outre-mer d'abord, c'est là que les sources ouvertes manquent le plus
-const outreMer = ed => /^(9[78]|JE|GG)/.test(String(ed.insee || '')) ? 0 : 1;
-const todo = [...bySite.entries()].filter(([h]) => {
+// et les îles (Ouessant, Molène, Sein, Batz, Bréhat, Groix, Belle-Île, Houat, Hoëdic, Île-aux-Moines, Ré, Oléron, Yeu, Noirmoutier, Corse…)
+const ILE = /(^|[\s'-])(Îles?|Iles?|Ouessant|Molène|Bréhat|Hoëdic|Houat|Groix|Sauzon|Oléron|Noirmoutier|Barbâtre|Rivedoux|Loix)([\s'-]|$)|-en-Ré|-de-Ré|Île-d'Yeu/i;
+const outreMer = ed => /^(9[78]|JE|GG|2A|2B)/.test(String(ed.insee || '')) || ILE.test(ed.nom || '') ? 0 : 1;
+const todo = [...bySite.entries()].filter(([h, ed]) => {
   const v = vus[h]; if (!v) return true;
+  // 21 nov : îles Anglo-Normandes revues avec les mots anglais (What's on, Events)
+  if (/^(JE|GG)$/.test(ed.insee) && v.r && !v.r.agenda && Date.parse(v.t) < Date.parse('2026-11-21T21:30:00Z')) return true;
   const age = now - Date.parse(v.t);
   return age > (v.r && v.r.q ? 7 * 86400000 : REVISIT);
 }).sort((a, b) => (vus[a[0]] ? 1 : 0) - (vus[b[0]] ? 1 : 0) || outreMer(a[1]) - outreMer(b[1]) || rank[a[1].type] - rank[b[1].type] || String((vus[a[0]] || {}).t || '').localeCompare(String((vus[b[0]] || {}).t || '')))
@@ -113,7 +117,7 @@ function scan(html, base) {
   for (const m of html.matchAll(/<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]{0,160}?)<\/a>/gi)) {
     const href = m[1]; const label = m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     if (/^webcal:|\.ics(\?|$)|[?&](ical|ics)=|\/ical\/?$|format=ical/i.test(href)) add(href, 'ics');
-    else if (!out.agenda && (/^(l'|l’)?(agenda|[ée]v[ée]nements?|sortir|que faire|sorties|animations|f[êe]tes et manifestations)\b/i.test(label) || /\/(agenda|evenements?|sortir|animations)(\/|\.html?|$)/i.test(href)) && !/demarche|presse|interdiction|arret|reglementation/i.test(href)) { const x = safeUrl(href, base); if (x && normHost(x.href) === normHost(base)) out.agenda = x.href; }
+    else if (!out.agenda && (/^(l'|l’)?(agenda|[ée]v[ée]nements?|sortir|que faire|sorties|animations|f[êe]tes et manifestations|what'?s on|events?)\b/i.test(label) || /\/(agenda|evenements?|sortir|animations|whats-on|what-s-on|events?)(\/|\.html?|$)/i.test(href)) && !/demarche|presse|interdiction|arret|reglementation/i.test(href)) { const x = safeUrl(href, base); if (x && normHost(x.href) === normHost(base)) out.agenda = x.href; }
   }
   for (const m of html.matchAll(/openagenda\.com\/(?:fr\/|en\/)?(?:agendas\/(\d+)|([a-z0-9][a-z0-9-]{2,60}))(?=[\/"'?#\s])/gi)) {
     const v = m[1] || m[2]; if (!/^(js|css|images?|static|api|assets|embeds?|widget|fr|en|agendas|contribute|signin|login|home|pricing)$/i.test(v)) out.oa.add(v);
