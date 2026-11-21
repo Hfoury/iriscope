@@ -19,6 +19,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - run: npm i --no-save xlsx@0.18.5
       - name: Exploration
         if: inputs.explorer == 'oui'
         run: node outils/cinemas.mjs --explore
