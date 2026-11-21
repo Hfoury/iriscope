@@ -54,8 +54,8 @@ for (const t of ['', '&type=arrondissement-municipal']) {
 // salles OpenStreetMap de France entière (métropole et outre-mer) : position exacte quand le nom correspond
 let osm = [];
 try {
-  const q = '[out:json][timeout:180];(area["ISO3166-1"="FR"];area["ISO3166-2"~"^FR-(971|972|973|974|976|GP|MQ|GF|RE|YT|PM|BL|MF|NC|PF|WF)$"];)->.a;nwr["amenity"="cinema"](area.a);out center tags;';
-  for (const ep of ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter']) {
+  const q = '[out:json][timeout:240];area["ISO3166-1"="FR"][admin_level=2]->.a;nwr["amenity"="cinema"](area.a);out center tags;';
+  for (const ep of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter']) {
     try {
       const r = await fetch(ep, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'User-Agent': UA['User-Agent'], 'Content-Type': 'application/x-www-form-urlencoded' } });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
