@@ -50,7 +50,8 @@ try { if (PREV) prev = JSON.parse(fs.readFileSync(PREV, 'utf8')); } catch (e) { 
 const vus = prev.vus || {};       // hôte -> { t: date, r: résultat compact }
 
 // ordre : préfectures, puis intercos, puis mairies ; jamais vus d'abord, puis les plus anciens ; quarantaine revue au bout de 7 jours
-const rank = { 'préfecture': 0, interco: 1, mairie: 2 };
+// mairies et intercos d'abord (ce sont elles qui publient les sorties) ; préfectures ensuite (alertes, pas d'agenda de sorties)
+const rank = { interco: 0, mairie: 1, 'préfecture': 2 };
 const todo = [...bySite.entries()].filter(([h]) => {
   const v = vus[h]; if (!v) return true;
   const age = now - Date.parse(v.t);
@@ -80,7 +81,7 @@ async function get(u, max = 1500000) {
     const reader = r.body.getReader(); const chunks = []; let n = 0;
     for (;;) { const { done, value } = await reader.read(); if (done) break; n += value.length; if (n > max) { ctl.abort(); throw new Error('trop gros'); } chunks.push(value); }
     return { url: r.url, type: r.headers.get('content-type') || '', text: Buffer.concat(chunks).toString('utf8') };
-  } finally { clearTimeout(tm); }
+  } catch (e) { const c = e.cause && (e.cause.code || e.cause.message); throw new Error(c ? `${e.message} (${c})` : e.message); } finally { clearTimeout(tm); }
 }
 
 // ---------- 3. Repérage des agendas dans une page ----------
@@ -97,7 +98,7 @@ function scan(html, base) {
   for (const m of html.matchAll(/<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]{0,160}?)<\/a>/gi)) {
     const href = m[1]; const label = m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     if (/^webcal:|\.ics(\?|$)|[?&](ical|ics)=|\/ical\/?$|format=ical/i.test(href)) add(href, 'ics');
-    else if (/agenda|evenement|événement|sortir|manifestation/i.test(label + ' ' + href) && !out.agenda) { const x = safeUrl(href, base); if (x && normHost(x.href) === normHost(base)) out.agenda = x.href; }
+    else if (!out.agenda && (/^(l'|l’)?(agenda|[ée]v[ée]nements?|sortir|que faire|sorties|animations|f[êe]tes et manifestations)\b/i.test(label) || /\/(agenda|evenements?|sortir|animations)(\/|\.html?|$)/i.test(href)) && !/demarche|presse|interdiction|arret|reglementation/i.test(href)) { const x = safeUrl(href, base); if (x && normHost(x.href) === normHost(base)) out.agenda = x.href; }
   }
   for (const m of html.matchAll(/openagenda\.com\/(?:fr\/|en\/)?(?:agendas\/(\d+)|([a-z0-9][a-z0-9-]{2,60}))(?=[\/"'?#\s])/gi)) {
     const v = m[1] || m[2]; if (!/^(js|css|images?|static|api|assets|embeds?|widget|fr|en|agendas|contribute|signin|login|home|pricing)$/i.test(v)) out.oa.add(v);
@@ -157,7 +158,11 @@ async function oaUid(v) {
 async function visit(host, ed) {
   const res = { feeds: [], agenda: null, oa: [] };
   let home;
-  try { home = await get(ed.site); } catch (e) { return { ...res, q: String(e.message || e).slice(0, 80) }; }
+  // l'adresse de l'annuaire est parfois ancienne : on essaie aussi https, puis avec ou sans « www. »
+  const tries = [ed.site]; try { const x = new URL(ed.site); const alt = x.hostname.startsWith('www.') ? x.hostname.slice(4) : `www.${x.hostname}`; tries.push(`https://${x.hostname}${x.pathname}`, `https://${alt}/`); } catch (e) { /* adresse illisible */ }
+  let err = '';
+  for (const u of [...new Set(tries)]) { try { home = await get(u); break; } catch (e) { err = err || String(e.message || e).slice(0, 80); } }
+  if (!home) return { ...res, q: err };
   const s1 = scan(home.text, home.url);
   let lic = s1.licence; let agenda = s1.agenda;
   const feeds = new Map(s1.feeds); const oa = new Set(s1.oa);
