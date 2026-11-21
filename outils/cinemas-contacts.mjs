@@ -11,8 +11,8 @@ async function getText(url, ms = 15000) {
 }
 async function osmTags(lat, lon) {
   const q = `[out:json][timeout:25];nwr["amenity"="cinema"](around:400,${lat},${lon});out tags 5;`;
-  for (const ep of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter']) {
-    try { const r = await fetch(ep, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { ...UA, 'Content-Type': 'application/x-www-form-urlencoded' } }); if (!r.ok) continue; return ((await r.json()).elements || []).map(e => e.tags || {}); } catch (e) { /* suivant */ }
+  for (const ep of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
+    try { const c = new AbortController(); setTimeout(() => c.abort(), 20000); const r = await fetch(ep, { method: 'POST', signal: c.signal, body: 'data=' + encodeURIComponent(q), headers: { ...UA, 'Content-Type': 'application/x-www-form-urlencoded' } }); if (!r.ok) continue; return ((await r.json()).elements || []).map(e => e.tags || {}); } catch (e) { /* suivant */ }
   }
   return [];
 }
