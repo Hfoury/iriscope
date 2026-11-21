@@ -1,0 +1,24 @@
+name: Salles de cinéma (CNC)
+# Une fois par mois (et à la demande) : la liste officielle des salles de cinéma du CNC (Licence Ouverte), publiée sur la branche « cinemas ».
+on:
+  schedule:
+    - cron: '17 4 3 * *'
+  workflow_dispatch:
+    inputs:
+      explorer:
+        description: Afficher seulement les jeux de données (oui/non)
+        default: 'non'
+permissions:
+  contents: write
+jobs:
+  cinemas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Exploration
+        if: inputs.explorer == 'oui'
+        run: node outils/cinemas.mjs --explore
