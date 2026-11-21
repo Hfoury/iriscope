@@ -15,7 +15,7 @@ on:
         default: true
       max:
         description: 'Nombre de sites publics à visiter'
-        default: '400'
+        default: '800'
       europe:
         description: 'Chercher aussi en Europe (data.europa.eu)'
         type: boolean
@@ -53,7 +53,7 @@ jobs:
           curl -sfL -o ancien-decouverte.json "https://raw.githubusercontent.com/${{ github.repository }}/sources/sources/decouverte.json" || echo '{}' > ancien-decouverte.json
           curl -sfL -o /tmp/annuaire.tar.bz2 https://lecomarquage.service-public.gouv.fr/donnees_locales_v4/all_latest.tar.bz2
           mkdir -p /tmp/annuaire && tar xjf /tmp/annuaire.tar.bz2 -C /tmp/annuaire --wildcards '*local.json'
-          node outils/decouverte.mjs "$(ls /tmp/annuaire/*local.json | head -n 1)" sortie ancien-decouverte.json --max=${{ github.event.inputs.max || '400' }} ${{ github.event.inputs.europe == 'true' && '--europe' || '' }}
+          node outils/decouverte.mjs "$(ls /tmp/annuaire/*local.json | head -n 1)" sortie ancien-decouverte.json --max=${{ github.event.inputs.max || '800' }} ${{ github.event.inputs.europe == 'true' && '--europe' || '' }}
           cat sortie/sources/decouverte.md >> sortie/sources/rapport.md
       - name: Publication sur la branche sources
         run: |

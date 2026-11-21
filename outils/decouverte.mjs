@@ -16,13 +16,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const [ANNU, OUT = 'sortie', PREV = ''] = process.argv.slice(2).filter(a => !a.startsWith('--'));
-const MAX = Number((process.argv.find(a => a.startsWith('--max=')) || '--max=400').slice(6));
+const MAX = Number((process.argv.find(a => a.startsWith('--max=')) || '--max=800').slice(6));
 const UA = 'iriscope-sources/1.0 (+https://github.com/Hfoury/iriscope; agendas publics)';
 const now = new Date();
 const today = now.toISOString().slice(0, 10);
 const REVISIT = 60 * 86400000;
 const tileOf = (lat, lon) => `${Math.floor(lat * 2)}_${Math.floor(lon * 2)}`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+// licence cherchée dans le TEXTE visible (sans scripts ni styles : « #cc0 » d'une couleur ne compte pas), en mots entiers
+const OPEN_LIC = /\b(Licence Ouverte|Open Licen[cs]e|Etalab|CC[- ]BY(?:[- ]SA)?(?![- ]?NC)(?:[- ]\d\.\d)?|ODbL|CC0 ?1\.0|Creative Commons (?:Attribution|Zero)(?! ?-? ?Pas d'Utilisation Commerciale)(?! ?-? ?NonCommercial))\b/;
+const visible = html => html.replace(/<(script|style|noscript|svg)\b[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
 // ---------- 1. Éditeurs depuis l'annuaire ----------
 const TYPES = { mairie: 'mairie', epci: 'interco', prefecture: 'préfecture', sous_pref: 'préfecture' };
@@ -48,6 +51,8 @@ function normHost(u) { try { const x = new URL(u); return x.hostname.replace(/^w
 let prev = {};
 try { if (PREV) prev = JSON.parse(fs.readFileSync(PREV, 'utf8')); } catch (e) { prev = {}; }
 const vus = prev.vus || {};       // hôte -> { t: date, r: résultat compact }
+// 21 nov : l'ancien test de licence prenait « #cc0 » (une couleur) pour une licence : ces sites sont revus
+for (const v of Object.values(vus)) if (v.r && v.r.licence && !OPEN_LIC.test(v.r.licence)) { delete v.r.licence; (v.r.feeds || []).forEach(f => { if (f.statut === 'actif') { f.statut = 'lien'; delete f.licence; } }); }
 
 // ordre : préfectures, puis intercos, puis mairies ; jamais vus d'abord, puis les plus anciens ; quarantaine revue au bout de 7 jours
 // mairies et intercos d'abord (ce sont elles qui publient les sorties) ; préfectures ensuite (alertes, pas d'agenda de sorties)
@@ -85,7 +90,6 @@ async function get(u, max = 1500000) {
 }
 
 // ---------- 3. Repérage des agendas dans une page ----------
-const OPEN_LIC = /licence ouverte|open licen[cs]e|etalab|creative ?commons|cc[- ]by(?![- ]?nc)|odbl|cc0|domaine public/i;
 function scan(html, base) {
   const out = { feeds: new Map(), agenda: null, oa: new Set(), licence: null };
   const add = (u, kind) => { const x = safeUrl(u.replace(/&amp;/g, '&'), base); if (x && !out.feeds.has(x.href)) out.feeds.set(x.href, kind); };
@@ -104,7 +108,7 @@ function scan(html, base) {
     const v = m[1] || m[2]; if (!/^(js|css|images?|static|api|assets|embeds?|widget|fr|en|agendas|contribute|signin|login|home|pricing)$/i.test(v)) out.oa.add(v);
   }
   for (const m of html.matchAll(/data-oa-agenda(?:-uid)?=["'](\d+)/gi)) out.oa.add(m[1]);
-  const lic = html.match(OPEN_LIC); if (lic) out.licence = lic[0];
+  const lic = visible(html).match(OPEN_LIC); if (lic) out.licence = lic[0];
   return out;
 }
 
@@ -228,7 +232,8 @@ for (const [h, v] of Object.entries(vus)) {
     if ((f.statut === 'actif' || f.statut === 'lien') && !best) best = { u: f.url, k: f.kind, s: f.statut };
   }
   for (const o of r.oa || []) { compte[o.statut]++; if (!best && o.statut === 'lien') best = { u: /^\d+$/.test(o.v) ? `https://openagenda.com/agendas/${o.v}` : `https://openagenda.com/${o.v}`, k: 'openagenda', s: 'lien' }; }
-  if (!best && r.agenda) best = { u: r.agenda, k: 'page', s: 'lien' };
+  // page « agenda » seule : jamais pour une préfecture (« manifestations » y veut dire démarches), jamais une page de presse ou d'arrêté
+  if (!best && r.agenda && ed.type !== 'préfecture' && !/demarche|presse|interdiction|arrete|manifestation-d-interet|reglementation/i.test(r.agenda)) best = { u: r.agenda, k: 'page', s: 'lien' };
   if (best) {
     compte.agendas++;
     if (ed.lat != null) { const t = tileOf(ed.lat, ed.lon); (liens[t] = liens[t] || []).push({ n: ed.nom.replace(/^Mairie - /, ''), ty: ed.type, i: ed.insee, la: ed.lat, lo: ed.lon, u: best.k === 'ics' || best.k === 'rss' || best.k === 'atom' ? (r.agenda || best.u) : best.u, k: best.k, s: best.s }); }
