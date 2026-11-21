@@ -13,7 +13,7 @@ permissions:
 jobs:
   cinemas:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,3 +23,16 @@ jobs:
       - name: Exploration
         if: inputs.explorer == 'oui'
         run: node outils/cinemas.mjs --explore
+      - name: Liste des salles
+        if: inputs.explorer != 'oui'
+        run: node outils/cinemas.mjs sortie
+      - name: Publication sur la branche cinemas
+        if: inputs.explorer != 'oui'
+        run: |
+          cd sortie
+          git init -q -b cinemas
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Salles de cinéma du $(date -u +%F)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" cinemas
