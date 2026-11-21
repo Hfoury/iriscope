@@ -21,9 +21,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Decompresser le zip le plus recent
         run: |
-          ZIP=$(ls veille-web-*.zip | sort -V | tail -n 1)
+          ZIP=$(ls veille-web-[0-9]*.zip | sort -V | tail -n 1)
           mkdir site && unzip -q "$ZIP" -d site
           test -f site/index.html
+          # projet bis (autre visuel, à l'essai) : publié à part sur /iriscope/bis/ s'il est déposé
+          BIS=$(ls veille-web-bis-*.zip 2>/dev/null | sort -V | tail -n 1 || true)
+          if [ -n "$BIS" ]; then mkdir -p site/bis && unzip -q "$BIS" -d site/bis && test -f site/bis/index.html; fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
