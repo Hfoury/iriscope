@@ -13,11 +13,11 @@ async function get(url) {
   }
   throw last;
 }
-const cat = await get(`${HOST}/catalog/datasets?where=${encodeURIComponent('search("cinéma") OR search("cinematographiques")')}&limit=30`);
-const sets = (cat.results || []).map(d => ({ id: d.dataset_id, title: d.metas && d.metas.default && d.metas.default.title, lic: d.metas && d.metas.default && d.metas.default.license, n: d.metas && d.metas.default && d.metas.default.records_count, fields: (d.fields || []).map(f => `${f.name}:${f.type}`) }));
 if (args.includes('--explore')) {
-  for (const d of sets) console.log(JSON.stringify(d));
-  const best = sets.find(d => /etablissements-cinematographiques/.test(d.id)) || sets[0];
-  if (best) { const s = await get(`${HOST}/catalog/datasets/${best.id}/records?limit=2`); console.log('EXEMPLE', JSON.stringify(s.results, null, 1).slice(0, 3000)); }
+  const j = await get('https://www.data.gouv.fr/api/1/datasets/?q=' + encodeURIComponent('établissements cinématographiques') + '&page_size=10');
+  for (const d of j.data || []) {
+    console.log('JEU', d.title, '|', d.organization && d.organization.name, '|', d.license, '|', d.id, '|', d.last_update);
+    for (const r of (d.resources || []).slice(0, 6)) console.log('   RES', r.format, '|', r.title, '|', r.url, '|', r.last_modified);
+  }
   process.exit(0);
 }
