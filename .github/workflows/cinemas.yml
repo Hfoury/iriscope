@@ -8,12 +8,15 @@ on:
       explorer:
         description: Afficher seulement les jeux de données (oui/non)
         default: 'non'
+      contacts:
+        description: Départements où chercher les contacts des salles indépendantes (ex. 29,56), vide sinon
+        default: ''
 permissions:
   contents: write
 jobs:
   cinemas:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,10 +27,10 @@ jobs:
         if: inputs.explorer == 'oui'
         run: node outils/cinemas.mjs --explore
       - name: Liste des salles
-        if: inputs.explorer != 'oui'
+        if: inputs.explorer != 'oui' && inputs.contacts == ''
         run: node outils/cinemas.mjs sortie
       - name: Publication sur la branche cinemas
-        if: inputs.explorer != 'oui'
+        if: inputs.explorer != 'oui' && inputs.contacts == ''
         run: |
           cd sortie
           git init -q -b cinemas
@@ -36,3 +39,6 @@ jobs:
           git add -A
           git commit -q -m "Salles de cinéma du $(date -u +%F)"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" cinemas
+      - name: Contacts des salles indépendantes
+        if: inputs.contacts != ''
+        run: node outils/cinemas-contacts.mjs "${{ inputs.contacts }}"
