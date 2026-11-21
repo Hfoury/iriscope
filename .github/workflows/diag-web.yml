@@ -1,0 +1,21 @@
+name: Diagnostic version web
+# Manuel uniquement : ouvre la version publiée dans un navigateur et liste les sources qui échouent. Ne publie rien.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Adresse à tester
+        default: https://hfoury.github.io/iriscope/bis/
+permissions:
+  contents: read
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm i --no-save playwright@1.48.2 && npx playwright install --with-deps chromium
+      - run: node outils/diag-web.cjs "${{ inputs.url }}"
