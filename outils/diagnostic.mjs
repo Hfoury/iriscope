@@ -1,17 +1,18 @@
-// Diagnostic manuel (21 nov 2026) : structure de l'annuaire de l'administration (DILA, Licence Ouverte). N'écrit rien.
-import { execSync } from 'node:child_process';
-import fs from 'node:fs';
-execSync('curl -sfL -o /tmp/a.tar.bz2 https://lecomarquage.service-public.gouv.fr/donnees_locales_v4/all_latest.tar.bz2 && mkdir -p /tmp/a && tar xjf /tmp/a.tar.bz2 -C /tmp/a');
-console.log(execSync('ls -laR /tmp/a | head -20').toString());
-const f = execSync("find /tmp/a -name '*.json' | head -3").toString().trim().split('\n');
-console.log('fichiers json', f);
-const j = JSON.parse(fs.readFileSync(f[0], 'utf8'));
-const arr = Array.isArray(j) ? j : j.service || j.data || Object.values(j)[0];
-console.log('n=', arr.length, 'clés racine', Object.keys(j).slice(0, 5));
-const types = {}; let site = 0;
-for (const r of arr) { const t = (r.pivot || []).map(p => p.type_service_local).join(',') || r.type_organisme || '?'; types[t] = (types[t] || 0) + 1; if ((r.site_internet || []).length) site++; }
-console.log('avec site', site); console.log(Object.entries(types).sort((a, b) => b[1] - a[1]).slice(0, 25));
-const m = arr.find(r => JSON.stringify(r.pivot || '').includes('mairie') && (r.site_internet || []).length);
-console.log('exemple mairie', JSON.stringify(m).slice(0, 2500));
-const e = arr.find(r => JSON.stringify(r.pivot || '').includes('epci'));
-console.log('exemple epci', JSON.stringify(e).slice(0, 1200));
+// Diagnostic manuel (21 nov 2026) : sources « non joignables » sur la version web (B). Vérifie statut, durée et en-tête CORS. N'écrit rien.
+const today = new Date().toISOString().slice(0, 10);
+const P = ['alder_pollen', 'birch_pollen', 'grass_pollen', 'mugwort_pollen', 'ragweed_pollen', 'olive_pollen'];
+const U = {
+  vigilance: 'https://feeds.meteoalarm.org/api/v1/warnings/feeds-france',
+  vigilanceAtom: 'https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-france',
+  air: `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=47.618,48.188&longitude=-2.919,-3.817&current=european_aqi,${P.join(',')}&timezone=Europe%2FParis`,
+  vacances: `https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-calendrier-scolaire/records?where=${encodeURIComponent(`zones="Zone B" AND end_date >= date'${today}'`)}&order_by=start_date&limit=60`,
+  geo: 'https://geo.api.gouv.fr/communes?lat=47.62&lon=-2.92&fields=departement&limit=1',
+};
+for (let k = 0; k < 2; k++) for (const [n, u] of Object.entries(U)) {
+  const t0 = Date.now();
+  try {
+    const r = await fetch(u, { headers: { Origin: 'https://hfoury.github.io', Accept: 'application/json, text/xml, application/xml, */*' }, signal: AbortSignal.timeout(25000) });
+    const body = await r.text();
+    console.log(`${n} : HTTP ${r.status} en ${Date.now() - t0} ms, ACAO=${r.headers.get('access-control-allow-origin')}, ${body.length} octets, début=${body.slice(0, 120).replace(/\s+/g, ' ')}`);
+  } catch (e) { console.log(`${n} : ÉCHEC en ${Date.now() - t0} ms : ${e.message} ${e.cause ? e.cause.code || '' : ''}`); }
+}
