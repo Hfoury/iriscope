@@ -1,4 +1,4 @@
-name: Alertes et risques (crues, feux de forêt, cyclones)
+name: Alertes et risques (crues, feux de forêt, cyclones, vigilance météo)
 
 # Toutes les heures : vigilance crues (Vigicrues), danger d'incendie par département (Météo des forêts, Météo-France)
 # et cyclones en cours (NHC, GDACS), publiés sur la branche « risques » lue par l'appli. Gratuit, sans clé.
@@ -25,9 +25,9 @@ jobs:
           node-version: 22
       - name: Données de l'heure précédente
         run: |
-          if git fetch -q --depth=1 origin risques 2>/dev/null; then git show FETCH_HEAD:risques/index.json > ancien.json || echo '{}' > ancien.json; else echo '{}' > ancien.json; fi
+          if git fetch -q --depth=1 origin risques 2>/dev/null; then git show FETCH_HEAD:risques/index.json > ancien.json || echo '{}' > ancien.json; git show FETCH_HEAD:risques/vigilance.json > ancien-vig.json || echo '{}' > ancien-vig.json; else echo '{}' > ancien-vig.json; echo '{}' > ancien.json; fi
       - name: Calcul
-        run: node outils/risques.mjs sortie --ancien ancien.json
+        run: node outils/risques.mjs sortie --ancien ancien.json --ancien-vig ancien-vig.json
       - name: Publication sur la branche risques
         run: |
           cd sortie

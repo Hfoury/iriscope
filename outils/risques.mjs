@@ -103,6 +103,40 @@ async function volcans() {
   return out;
 }
 
+// ---------- vigilance météo (MeteoAlarm, données Météo-France) ----------
+// Le flux MeteoAlarm n'autorise pas les navigateurs (pas d'en-tête CORS) : la version web de l'appli
+// lit donc cette copie allégée, rafraîchie toutes les heures, même forme que le flux d'origine.
+async function vigilance() {
+  const j = await get('https://feeds.meteoalarm.org/api/v1/warnings/feeds-france');
+  const now = Date.now();
+  const warnings = [];
+  for (const w of (j.warnings || [])) {
+    const a = w.alert || w;
+    if (/cancel/i.test(a.msgType || '')) continue;
+    const infos = a.info || [];
+    const i = infos.find(x => /^fr/i.test(x.language || '')) || infos[0];
+    if (!i || (i.expires && new Date(i.expires).getTime() <= now)) continue;
+    const keep = ['language', 'onset', 'effective', 'expires', 'severity', 'headline', 'event', 'description', 'instruction', 'web'];
+    const info = Object.fromEntries(keep.filter(k => i[k] != null).map(k => [k, i[k]]));
+    info.parameter = (i.parameter || []).filter(p => /awareness_(level|type)/.test(p.valueName));
+    info.area = (i.area || []).map(x => ({ areaDesc: x.areaDesc }));
+    warnings.push({ alert: { msgType: a.msgType, sent: a.sent, info: [info] } });
+  }
+  return { updated: new Date().toISOString(), source: 'MeteoAlarm, Météo-France', warnings };
+}
+
+fs.mkdirSync(OUT, { recursive: true });
+{
+  const vf = args.includes('--ancien-vig') ? args[args.indexOf('--ancien-vig') + 1] : null;
+  let v;
+  try { v = await vigilance(); console.log(`vigilance : ${v.warnings.length} avis`); }
+  catch (e) {
+    console.log(`vigilance : échec (${e.message}), données précédentes gardées`);
+    try { v = JSON.parse(fs.readFileSync(vf, 'utf8')); } catch (e2) { v = null; }
+  }
+  if (v) fs.writeFileSync(path.join(OUT, 'vigilance.json'), JSON.stringify(v));
+}
+
 const res = { updated: new Date().toISOString(), source: 'Vigicrues, Météo-France (Licence Ouverte), NHC (domaine public), GDACS' };
 for (const [k, f] of [['crues', crues], ['forets', forets], ['cyclones', cyclones], ['volcans', volcans]]) {
   try { res[k] = await f(); }
