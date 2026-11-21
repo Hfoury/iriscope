@@ -41,6 +41,15 @@ for (const r of raw.service || []) {
   const a = (r.adresse || []).find(x => x.latitude) || {};
   editeurs.push({ id: r.id, nom: r.nom, type: t, insee: r.code_insee_commune || '', lat: Number(a.latitude) || null, lon: Number(a.longitude) || null, site: site.trim() });
 }
+// Îles Anglo-Normandes (dépendances de la Couronne britannique, absentes de l'annuaire français) : éditeurs publics officiels ajoutés à la main
+for (const e of [
+  { id: 'je-gov', nom: 'Gouvernement de Jersey', type: 'interco', insee: 'JE', lat: 49.1858, lon: -2.1100, site: 'https://www.gov.je/' },
+  { id: 'je-visit', nom: 'Visit Jersey (office du tourisme)', type: 'interco', insee: 'JE', lat: 49.1858, lon: -2.1100, site: 'https://www.jersey.com/' },
+  { id: 'gg-gov', nom: 'Gouvernement de Guernesey', type: 'interco', insee: 'GG', lat: 49.4550, lon: -2.5360, site: 'https://www.gov.gg/' },
+  { id: 'gg-visit', nom: 'Visit Guernsey (office du tourisme)', type: 'interco', insee: 'GG', lat: 49.4550, lon: -2.5360, site: 'https://www.visitguernsey.com/' },
+  { id: 'gg-alderney', nom: 'Aurigny (States of Alderney)', type: 'interco', insee: 'GG', lat: 49.7140, lon: -2.2050, site: 'https://www.alderney.gov.gg/' },
+  { id: 'gg-sark', nom: 'Sercq (Chief Pleas of Sark)', type: 'interco', insee: 'GG', lat: 49.4300, lon: -2.3600, site: 'https://www.gov.sark.gg/' },
+]) editeurs.push(e);
 const bySite = new Map();
 for (const e of editeurs) { const k = normHost(e.site); if (!k) continue; if (!bySite.has(k)) bySite.set(k, e); }
 console.log(`Annuaire : ${editeurs.length} éditeurs avec site, ${bySite.size} sites distincts.`);
@@ -58,7 +67,7 @@ for (const v of Object.values(vus)) if (v.r && v.r.licence && !OPEN_LIC.test(v.r
 // mairies et intercos d'abord (ce sont elles qui publient les sorties) ; préfectures ensuite (alertes, pas d'agenda de sorties)
 const rank = { interco: 0, mairie: 1, 'préfecture': 2 };
 // 21 nov (Hervé) : l'outre-mer d'abord, c'est là que les sources ouvertes manquent le plus
-const outreMer = ed => /^9[78]/.test(String(ed.insee || '')) ? 0 : 1;
+const outreMer = ed => /^(9[78]|JE|GG)/.test(String(ed.insee || '')) ? 0 : 1;
 const todo = [...bySite.entries()].filter(([h]) => {
   const v = vus[h]; if (!v) return true;
   const age = now - Date.parse(v.t);
