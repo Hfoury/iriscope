@@ -17,11 +17,11 @@ function geoOf(r) {
 }
 const cpOf = (...v) => String(v.find(x => /^\d{5}$/.test(String(x || '').trim())) || '').trim();
 
-async function ods(host, dataset, where) {
-  const url = `https://${host}/api/explore/v2.1/catalog/datasets/${dataset}/exports/json?where=${encodeURIComponent(where)}`;
+async function ods(host, dataset, where, select = '') {
+  const url = `https://${host}/api/explore/v2.1/catalog/datasets/${dataset}/exports/json?where=${encodeURIComponent(where)}${select ? `&select=${select}` : ''}`;
   for (let k = 0; ; k++) {
     try {
-      const r = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(120000) });
+      const r = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(600000) });
       if (r.ok) return await r.json();
       throw new Error(`HTTP ${r.status} ${(await r.text()).slice(0, 150)}`);
     } catch (e) { if (k >= 2) throw e; await sleep(4000 * (k + 1)); }
@@ -98,6 +98,61 @@ export const AGENDAS = [
 ];
 
 // Lit tous les agendas ; un agenda en panne n'empêche jamais les autres. Renvoie { events, bilan }.
+// 21 nov 2026 : OpenAgenda et Que faire à Paris passent AUSSI par les tuiles de nuit, en entier (exports complets, sans plafond).
+// Avant, le téléphone les lisait seulement en direct : 300 OpenAgenda et 400 Paris au plus par zone, et une page ratée était perdue.
+// Le direct reste dans l'appli pour les nouveautés du jour ; les tuiles garantissent que rien n'est oublié si un serveur flanche.
+const JUNK = /emploi|m[ée]tiers?\b|recrutement|job ?dating|france travail|semaine de l.industrie|webinaire|permanence|conseil municipal|r[ée]union d.information/i;
+const slot = v => { const m = String(v || '').match(/^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?/); return m ? { d: m[1], h: m[2] || '' } : null; };
+function periodsFrom(pairs, from, to) {
+  const out = [];
+  for (const [b, e] of pairs) {
+    const x = slot(b), y = slot(e) || x; if (!x) continue;
+    if (y.d < from || x.d > to) continue;
+    out.push({ s: x.d, e: y.d, st: x.h, et: y.h });
+  }
+  return out.sort((p, q) => `${p.s}${p.st}`.localeCompare(`${q.s}${q.st}`)).slice(0, 6);
+}
+const parseJson = v => { if (Array.isArray(v)) return v; try { return JSON.parse(v); } catch (e) { return []; } };
+AGENDAS.push(
+  {
+    id: 'oa', s: 'OpenAgenda (agendas publics ouverts)',
+    async lire(from, to) {
+      const sel = 'uid,title_fr,description_fr,firstdate_begin,lastdate_end,timings,location_coordinates,location_name,location_address,location_city,location_postalcode,keywords_fr,conditions_fr,canonicalurl';
+      const where = `lastdate_end >= date'${from}' AND firstdate_begin <= date'${to}' AND location_countrycode = 'FR'`;
+      let rows;
+      try { rows = await ods('public.opendatasoft.com', 'evenements-publics-openagenda', where, sel); }
+      catch (e) { rows = await ods('public.opendatasoft.com', 'evenements-publics-openagenda', where); }
+      return rows.map(r => {
+        const g = geoOf({ c: r.location_coordinates }); const t = ent(r.title_fr);
+        if (!g || !t || JUNK.test(`${t} ${[].concat(r.keywords_fr || []).join(' ')}`)) return null;
+        const tm = parseJson(r.timings).map(x => [x.begin || x.start, x.end]);
+        const p = periodsFrom(tm.length ? tm : [[r.firstdate_begin, r.lastdate_end]], from, to);
+        if (!p.length) return null;
+        const free = /gratuit|libre|free/i.test(r.conditions_fr || '');
+        return { id: `oa-${r.uid || t}`, t: t.slice(0, 140), ...g, c: ent(r.location_city), a: ent(r.location_name || r.location_address).slice(0, 80), cp: cpOf(r.location_postalcode),
+          p, d: ent(r.description_fr).slice(0, 300), k: [...list(r.keywords_fr), ...(free ? ['gratuit'] : [])].slice(0, 8), u: r.canonicalurl || '' };
+      });
+    },
+  },
+  {
+    id: 'paris', s: 'Que faire à Paris (Ville de Paris, ODbL)',
+    async lire(from, to) {
+      const rows = await ods('opendata.paris.fr', 'que-faire-a-paris-', `date_end >= date'${from}' AND date_start <= date'${to}'`);
+      return rows.map(r => {
+        const g = geoOf({ c: r.lat_lon }); const t = ent(r.title);
+        if (!g || !t) return null;
+        const occ = String(r.occurrences || '').split(';').map(x => x.split('_')).filter(x => x.length === 2);
+        // une « occurrence » de plus de 45 jours sans détail = exposition ou offre permanente : on garde le dernier jour, l'appli la marque « longue »
+        const p = periodsFrom(occ.length ? occ : [[r.date_start, r.date_end]], from, to);
+        if (!p.length) return null;
+        const free = /gratuit/i.test(`${r.price_type || ''} ${r.price_detail || ''}`);
+        return { id: `paris-${r.id || t}`, t: t.slice(0, 140), ...g, c: ent(r.address_city || 'Paris'), a: ent(r.address_name).slice(0, 80), cp: cpOf(r.address_zipcode),
+          p, d: ent(r.lead_text || r.description).slice(0, 300), k: [...list(r.qfap_tags), ...(free ? ['gratuit'] : [])].slice(0, 8), u: r.url || '' };
+      });
+    },
+  },
+);
+
 export async function lireAgendas(from, to) {
   const events = [], bilan = {};
   for (const a of AGENDAS) {
