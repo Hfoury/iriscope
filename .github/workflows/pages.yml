@@ -11,12 +11,12 @@ permissions:
 concurrency:
   group: pages
   cancel-in-progress: true
+# 21 nov 2026 : préparation et mise en ligne en deux tâches séparées. Dans une seule tâche, la mise en ligne
+# démarrait parfois avant que GitHub ait enregistré le paquet (« No artifacts named github-pages »), et la relancer
+# créait un 2e paquet (« Multiple artifacts »). Séparées, la mise en ligne attend la fin de la préparation et peut se relancer seule.
 jobs:
-  publier:
+  preparer:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploiement.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - name: Decompresser le zip le plus recent
@@ -31,5 +31,12 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
+  publier:
+    needs: preparer
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    steps:
       - id: deploiement
         uses: actions/deploy-pages@v4
