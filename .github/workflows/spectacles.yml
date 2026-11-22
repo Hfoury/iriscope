@@ -1,0 +1,20 @@
+name: Théâtres et salles de spectacle (contacts)
+# À la demande seulement : cherche le site et l'adresse mail publique des théâtres, opéras et salles de spectacle de quelques départements. Ne publie rien.
+on:
+  workflow_dispatch:
+    inputs:
+      depts:
+        description: Départements (ex. 10,35,75)
+        default: '10,35,75'
+permissions:
+  contents: read
+jobs:
+  spectacles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node outils/spectacles-contacts.mjs "${{ inputs.depts }}"
