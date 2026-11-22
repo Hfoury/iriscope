@@ -1,0 +1,17 @@
+name: Diagnostic affiches
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  affiches:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - env:
+          DATATOURISME_KEY: ${{ secrets.DATATOURISME_KEY }}
+        run: node outils/diag-affiches.mjs
