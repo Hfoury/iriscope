@@ -46,9 +46,9 @@ function build(filters) {
 
 
 // Affiche de l'événement (b24) : première image fournie par l'organisateur.
-// i = adresse https de l'image, ic = crédit, il = 1 seulement si la licence déclarée autorise l'usage commercial (CC BY, BY-SA, CC0, Licence Ouverte,
-// domaine public) ; sinon 0 : l'appli n'affiche pas l'image dans la page, elle propose seulement « Voir l'affiche chez l'organisateur ».
-// Une licence absente, « NC » (pas d'usage commercial) ou « ND » n'est jamais comptée comme libre.
+// i = adresse https de l'image, ic = crédit, il = 1 si la licence déclarée autorise l'usage commercial (CC BY, BY-SA, CC0, Licence Ouverte, domaine public),
+// 2 si aucune licence n'est déclarée (affichée avec crédit, réglable par l'utilisateur), 0 si la licence l'interdit (« NC » ou « ND ») :
+// dans ce cas l'appli propose seulement « Voir l'affiche chez l'organisateur ».
 const OPEN = /(^|[^a-z])(by|by-sa|cc0|cc-by|cc-by-sa|licence ouverte|etalab|domaine public|public domain)(\s|$|[^a-z-])/i;
 function affiche(o) {
   for (const rep of arr(o.hasRepresentation)) {
@@ -59,7 +59,7 @@ function affiche(o) {
     const lic = String(arr(ann.isCoveredBy)[0] || '');
     const libre = !!lic && !/(^|[^a-z])(nc|nd)([^a-z]|$)/i.test(lic) && OPEN.test(lic);
     const credit = String(arr(ann.credits)[0] || '').replace(/\s+/g, ' ').trim().slice(0, 60);
-    return { i: url.replace(/^http:/, 'https:'), ...(credit && !/^non communiqu/i.test(credit) ? { ic: credit } : {}), il: libre ? 1 : 0 };
+    return { i: url.replace(/^http:/, 'https:'), ...(credit && !/^non communiqu/i.test(credit) ? { ic: credit } : {}), il: libre ? 1 : lic ? 0 : 2 };
   }
   return {};
 }
