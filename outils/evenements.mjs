@@ -39,11 +39,30 @@ function build(filters) {
   const u = new URL(API);
   u.searchParams.set('page_size', '100');
   u.searchParams.set('lang', 'fr');
-  u.searchParams.set('fields', 'uuid,label,type,isLocatedAt.geo,isLocatedAt.address,takesPlaceAt,hasDescription,hasContact.homepage,hasTheme,lastUpdate');
+  u.searchParams.set('fields', 'uuid,label,type,isLocatedAt.geo,isLocatedAt.address,takesPlaceAt,hasDescription,hasContact.homepage,hasTheme,lastUpdate,hasRepresentation');
   if (filters) u.searchParams.set('filters', filters);
   return u.toString();
 }
 
+
+// Affiche de l'événement (b24) : première image fournie par l'organisateur.
+// i = adresse https de l'image, ic = crédit, il = 1 seulement si la licence déclarée autorise l'usage commercial (CC BY, BY-SA, CC0, Licence Ouverte,
+// domaine public) ; sinon 0 : l'appli n'affiche pas l'image dans la page, elle propose seulement « Voir l'affiche chez l'organisateur ».
+// Une licence absente, « NC » (pas d'usage commercial) ou « ND » n'est jamais comptée comme libre.
+const OPEN = /(^|[^a-z])(by|by-sa|cc0|cc-by|cc-by-sa|licence ouverte|etalab|domaine public|public domain)(\s|$|[^a-z-])/i;
+function affiche(o) {
+  for (const rep of arr(o.hasRepresentation)) {
+    const url = arr(arr(rep.hasRelatedResource)[0]?.locator)[0];
+    if (!url || !/^https?:\/\//i.test(url)) continue;
+    if (/\.(pdf|svg|gif)(\?|$)/i.test(url)) continue;
+    const ann = arr(rep.hasAnnotation)[0] || {};
+    const lic = String(arr(ann.isCoveredBy)[0] || '');
+    const libre = !!lic && !/(^|[^a-z])(nc|nd)([^a-z]|$)/i.test(lic) && OPEN.test(lic);
+    const credit = String(arr(ann.credits)[0] || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    return { i: url.replace(/^http:/, 'https:'), ...(credit && !/^non communiqu/i.test(credit) ? { ic: credit } : {}), il: libre ? 1 : 0 };
+  }
+  return {};
+}
 function toEvent(o) {
   const loc = arr(o.isLocatedAt)[0] || {};
   const geo = loc.geo || {};
@@ -69,6 +88,7 @@ function toEvent(o) {
     p: periods.slice(0, 6), d: desc.replace(/\s+/g, ' ').trim().slice(0, 300),
     k: [...arr(o.type).map(fr), ...arr(o.hasTheme).map(t => fr(t.label ?? t))].filter(x => x && !/^(schema:|PointOfInterest|EntertainmentAndEvent)/.test(x)).slice(0, 8),
     u: arr(arr(o.hasContact)[0]?.homepage)[0] || '',
+    ...affiche(o),
   } };
 }
 
