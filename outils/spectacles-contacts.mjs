@@ -7,7 +7,11 @@ async function getText(url, ms = 15000) {
   try { const r = await fetch(url, { headers: UA, signal: c.signal, redirect: 'follow' }); if (!r.ok) return ''; return (await r.text()).slice(0, 600000); } catch (e) { return ''; } finally { clearTimeout(t); }
 }
 const area = `area["boundary"="administrative"]["admin_level"="6"]["ref:INSEE"~"^(${depts.join('|')})$"]->.d;`;
-const q = `[out:json][timeout:120];${area}(nwr["amenity"~"^(theatre|arts_centre)$"](area.d););out center tags;`;
+const V2 = process.argv[3] === 'vague2';
+// vague 2 : salles de concert, boîtes live, pubs/bars à concerts, guinguettes, cafés-théâtres, scènes ouvertes, cabarets, comedy clubs
+const q = V2
+  ? `[out:json][timeout:180];${area}(nwr["amenity"~"^(music_venue|concert_hall|nightclub|theatre|arts_centre)$"](area.d);nwr["amenity"~"^(pub|bar|cafe|restaurant|biergarten)$"]["live_music"~"yes|regular|^"](area.d);nwr["amenity"~"^(pub|bar|cafe|restaurant)$"]["name"~"guinguette|caf[eé][- ]th[eé][aâ]tre|comedy|cabaret|scène ouverte|open mic|jazz|live",i](area.d);nwr["name"~"guinguette|caf[eé][- ]th[eé][aâ]tre|comedy club|cabaret|salle de concert|scène ouverte",i]["amenity"](area.d););out center tags;`
+  : `[out:json][timeout:120];${area}(nwr["amenity"~"^(theatre|arts_centre)$"](area.d););out center tags;`;
 let els = [];
 outer: for (let k = 0; k < 3; k++) for (const ep of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter']) {
   try {
@@ -31,7 +35,7 @@ for (const e of els) {
   if (seen.has(key)) continue; seen.add(key);
   const cp = String(t['addr:postcode'] || '');
   const dept = cp.startsWith('75') ? '75' : cp.slice(0, 2);
-  const kind = t.amenity === 'arts_centre' ? 'centre' : (/opera|opéra/i.test(name + ' ' + (t['theatre:genre'] || '')) ? 'opéra' : 'théâtre');
+  const kind = V2 ? (t.amenity === 'music_venue' || t.amenity === 'concert_hall' ? 'concert' : t.amenity === 'nightclub' ? 'boîte' : /guinguette/i.test(name) ? 'guinguette' : /caf[eé][- ]th/i.test(name) ? 'café-théâtre' : /pub|bar|caf|restaurant|biergarten/.test(t.amenity) ? 'pub/bar' : t.amenity === 'theatre' ? 'théâtre' : 'centre') : t.amenity === 'arts_centre' ? 'centre' : (/opera|opéra/i.test(name + ' ' + (t['theatre:genre'] || '')) ? 'opéra' : 'théâtre');
   let site = t.website || t['contact:website'] || t.url || '';
   let mail = t.email || t['contact:email'] || '';
   if (site && !/^https?:/.test(site)) site = 'https://' + site;

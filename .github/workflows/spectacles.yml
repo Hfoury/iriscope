@@ -6,6 +6,9 @@ on:
       depts:
         description: Départements (ex. 10,35,75)
         default: '10,35,75'
+      mode:
+        description: vague2 pour concerts, pubs, guinguettes, cafés-théâtres
+        default: 'vague2'
 permissions:
   contents: read
 jobs:
@@ -17,4 +20,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node outils/spectacles-contacts.mjs "${{ inputs.depts }}"
+      - run: node outils/spectacles-contacts.mjs "${{ inputs.depts }}" "${{ inputs.mode }}"
