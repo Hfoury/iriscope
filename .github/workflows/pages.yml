@@ -27,6 +27,8 @@ jobs:
           # projet bis (autre visuel, à l'essai) : publié à part sur /iriscope/bis/ s'il est déposé
           BIS=$(ls veille-web-bis-*.zip 2>/dev/null | sort -V | tail -n 1 || true)
           if [ -n "$BIS" ]; then mkdir -p site/bis && unzip -q "$BIS" -d site/bis && test -f site/bis/index.html; fi
+          # page de présentation pour les salles (23 nov 2026) : publiée sur /iriscope/salles/
+          if [ -d salles ]; then mkdir -p site/salles && cp -r salles/. site/salles/; fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
