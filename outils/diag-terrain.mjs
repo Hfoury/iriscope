@@ -15,7 +15,7 @@ for (const [n, lat, lon, km] of zones) {
   for (const m of mirrors) {
     const t0 = Date.now();
     try {
-      const r = await fetch(m, { method: 'POST', body: 'data=' + encodeURIComponent(q(lat, lon, km)), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+      const r = await fetch(m, { method: 'POST', body: 'data=' + encodeURIComponent(q(lat, lon, km)), headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Iriscope-diagnostic/1.0 (https://hfoury.github.io/iriscope/)' } });
       const txt = await r.text();
       let c = '?'; try { c = JSON.parse(txt).elements.map(e => e.tags.total).join(' / '); } catch { c = txt.slice(0, 120); }
       console.log(`${n} ${km} km · ${m.split('/')[2]} · HTTP ${r.status} · ${Date.now() - t0} ms · côte/lacs/rivières/forêts/bâti = ${c}`);
