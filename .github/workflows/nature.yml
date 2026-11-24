@@ -1,18 +1,14 @@
 name: Nature (spots du coin et terrain des zones)
 
-# Chaque nuit : lit les extraits OpenStreetMap de Geofabrik (France métropolitaine et outre-mer, ODbL), garde les spots
+# Chaque nuit : lit les extraits OpenStreetMap de Geofabrik (régions de France métropolitaine, Corse et outre-mer, ODbL), garde les spots
 # (points de vue, monuments, phares, plages, aires de jeux…) et ce qui décrit le terrain (mer, lac, rivière, forêt),
 # et publie des tuiles sur la branche « nature » (lue par l'appli). Plus besoin des serveurs Overpass, souvent saturés.
+# Une tâche par région (le fichier France entier, 4,5 Go, se télécharge trop lentement), puis une tâche qui assemble.
 # Gratuit, sans clé (dépôt public : minutes Actions illimitées).
 on:
   schedule:
     - cron: '25 1 * * *'
   workflow_dispatch:
-    inputs:
-      regions:
-        description: "Extraits Geofabrik (chemins séparés par des espaces), pour un essai : europe/france/bretagne"
-        required: false
-        default: ''
 
 permissions:
   contents: write
@@ -22,41 +18,62 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  nature:
+  region:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        r: [alsace, aquitaine, auvergne, basse-normandie, bourgogne, bretagne, centre, champagne-ardenne, corse, franche-comte,
+            haute-normandie, ile-de-france, languedoc-roussillon, limousin, lorraine, midi-pyrenees, nord-pas-de-calais,
+            pays-de-la-loire, picardie, poitou-charentes, provence-alpes-cote-d-azur, rhone-alpes,
+            guadeloupe, guyane, martinique, mayotte, reunion]
+    steps:
+      - name: Outil osmium
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
+      - name: Téléchargement et filtrage
+        run: |
+          set -e
+          n=${{ matrix.r }}
+          for k in 1 2 3; do
+            curl -fsSL --retry 3 -A "iriscope-nature/1.0 (+https://hfoury.github.io/iriscope/)" -o "$n.osm.pbf" "https://download.geofabrik.de/europe/france/$n-latest.osm.pbf" && break
+            sleep 30
+          done
+          echo "$n : $(du -h "$n.osm.pbf" | cut -f1)"
+          osmium tags-filter -O -o "$n-f.osm.pbf" "$n.osm.pbf" \
+            nwr/tourism=viewpoint,attraction,picnic_site nwr/historic nwr/man_made=lighthouse \
+            nwr/natural=peak,waterfall,cape,arch,beach,wood nwr/natural=water nwr/waterway=river \
+            nwr/leisure=bathing_place,playground,horse_riding,fitness_station,fishing,marina nwr/sport nwr/rental \
+            nwr/harbour nwr/seamark:type nwr/landuse=forest
+          osmium export -O -f geojsonseq -a type,id -o "$n.geojsonseq" "$n-f.osm.pbf"
+          gzip -9 "$n.geojsonseq"
+          echo "$n : $(zcat "$n.geojsonseq.gz" | wc -l) objets"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nature-${{ matrix.r }}
+          path: ${{ matrix.r }}.geojsonseq.gz
+          retention-days: 1
+
+  assemblage:
+    needs: region
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Outil osmium
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
-      - name: Téléchargement et filtrage
-        env:
-          REGIONS: ${{ github.event.inputs.regions }}
-        run: |
-          set -e
-          R="${REGIONS:-europe/france central-america/guadeloupe central-america/martinique south-america/guyane africa/reunion africa/mayotte}"
-          for r in $R; do
-            n=$(basename "$r")
-            ok=0
-            for u in "https://download.geofabrik.de/$r-latest.osm.pbf" "https://download.geofabrik.de/europe/france/$n-latest.osm.pbf"; do
-              if curl -fsSL -A "iriscope-nature/1.0 (+https://hfoury.github.io/iriscope/)" -o "$n.osm.pbf" "$u"; then ok=1; echo "$n : $u ($(du -h "$n.osm.pbf" | cut -f1))"; break; fi
-            done
-            [ $ok = 1 ] || { echo "::warning::$n introuvable"; continue; }
-            osmium tags-filter -O -o "$n-f.osm.pbf" "$n.osm.pbf" \
-              nwr/tourism=viewpoint,attraction,picnic_site nwr/historic nwr/man_made=lighthouse \
-              nwr/natural=peak,waterfall,cape,arch,beach,wood nwr/natural=water nwr/waterway=river \
-              nwr/leisure=bathing_place,playground,horse_riding,fitness_station,fishing,marina nwr/sport nwr/rental \
-              nwr/harbour nwr/seamark:type nwr/landuse=forest
-            rm -f "$n.osm.pbf"
-            osmium export -O -f geojsonseq -a type,id -o "$n.geojsonseq" "$n-f.osm.pbf"
-            rm -f "$n-f.osm.pbf"
-            echo "$n : $(wc -l < "$n.geojsonseq") objets"
-          done
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nature-*
+          merge-multiple: true
+          path: regions
       - name: Tuiles
-        run: node --max-old-space-size=6144 outils/nature.mjs sortie *.geojsonseq
+        run: |
+          ls -la regions
+          for f in regions/*.gz; do gunzip "$f"; done
+          node --max-old-space-size=6144 outils/nature.mjs sortie regions/*.geojsonseq
       - name: Publication sur la branche nature
         run: |
           cd sortie
