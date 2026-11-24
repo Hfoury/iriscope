@@ -17,4 +17,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node outils/${{ inputs.script || 'diag-terrain.mjs' }}
+      - env:
+          DATATOURISME_KEY: ${{ secrets.DATATOURISME_KEY }}
+        run: node outils/${{ inputs.script || 'diag-terrain.mjs' }}
