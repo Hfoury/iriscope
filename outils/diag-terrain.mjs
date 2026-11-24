@@ -11,7 +11,8 @@ const parts = {
 };
 for (const [n, lat, lon, km] of zones) for (const [k, f] of Object.entries(parts)) {
   const t0 = Date.now();
-  const q = `[out:json][timeout:25];${f(`(around:${km * 1000},${lat},${lon})`)};out count;`;
+  const dl = km / 111, dn = km / (111 * Math.cos(lat * Math.PI / 180));
+  const q = `[out:json][timeout:25];${f(`(${(lat - dl).toFixed(3)},${(lon - dn).toFixed(3)},${(lat + dl).toFixed(3)},${(lon + dn).toFixed(3)})`)};out count;`;
   try {
     const r = await fetch(M, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: UA, signal: AbortSignal.timeout(40000) });
     const t = await r.text(); let c; try { c = JSON.parse(t).elements[0].tags.total; } catch { c = t.slice(0, 80).replace(/\s+/g, ' '); }
