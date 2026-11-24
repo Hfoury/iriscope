@@ -2,6 +2,10 @@ name: Diagnostic terrain
 # Manuel uniquement : teste la détection du terrain des zones, ne publie rien.
 on:
   workflow_dispatch:
+    inputs:
+      script:
+        description: Outil à lancer (dans outils/)
+        default: diag-terrain.mjs
 permissions:
   contents: read
 jobs:
@@ -13,4 +17,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node outils/diag-terrain.mjs
+      - run: node outils/${{ inputs.script || 'diag-terrain.mjs' }}
