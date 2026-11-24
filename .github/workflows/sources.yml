@@ -55,6 +55,12 @@ jobs:
           mkdir -p /tmp/annuaire && tar xjf /tmp/annuaire.tar.bz2 -C /tmp/annuaire --wildcards '*local.json'
           node outils/decouverte.mjs "$(ls /tmp/annuaire/*local.json | head -n 1)" sortie ancien-decouverte.json --max=${{ github.event.inputs.max || '800' }} ${{ github.event.inputs.europe == 'true' && '--europe' || '' }}
           cat sortie/sources/decouverte.md >> sortie/sources/rapport.md
+      # 24 nov 2026 (Hervé) : offices de tourisme (DATAtourisme), proposés avant les mairies dans « Agendas des mairies »
+      - name: Offices de tourisme
+        continue-on-error: true
+        env:
+          DATATOURISME_KEY: ${{ secrets.DATATOURISME_KEY }}
+        run: node outils/offices.mjs sortie
       - name: Publication sur la branche sources
         run: |
           cp sortie/nouveaux.md nouveaux.md && rm sortie/nouveaux.md

@@ -281,6 +281,20 @@ for (const [h, v] of Object.entries(vus)) {
     if (ed.lat != null) { const t = tileOf(ed.lat, ed.lon); (liens[t] = liens[t] || []).push({ n: ed.nom.replace(/^Mairie - /, ''), ty: ed.type, i: ed.insee, la: ed.lat, lo: ed.lon, u: deep(best.k === 'ics' || best.k === 'rss' || best.k === 'atom' ? (r.agenda || best.u) : best.u), k: best.k, s: best.s, ...(chef(ed) === 0 ? { pref: 1 } : {}) }); }
   }
 }
+// 24 nov (Hervé, « oui serveur ») : une préfecture ou sous-préfecture sans agenda lisible (Brest, Vannes, Marseille…) garde au moins
+// le lien vers le site officiel de sa mairie, tel que publié dans l'annuaire de l'État (rien de deviné). L'appli propose d'abord
+// l'office de tourisme de la ville (offices.json), puis ce site en dernier recours.
+{
+  const deja = new Set(Object.values(liens).flat().filter(x => x.ty === 'mairie').map(x => x.i));
+  let n = 0;
+  for (const ed of editeurs) {
+    if (ed.type !== 'mairie' || chef(ed) !== 0 || deja.has(ed.insee) || ed.lat == null || !/^https?:\/\//.test(ed.site || '')) continue;
+    deja.add(ed.insee); n++;
+    const t = tileOf(ed.lat, ed.lon);
+    (liens[t] = liens[t] || []).push({ n: ed.nom.replace(/^Mairie - /, ''), ty: 'mairie', i: ed.insee, la: ed.lat, lo: ed.lon, u: ed.site, k: 'site', s: 'site', pref: 1 });
+  }
+  console.log(`Chefs-lieux sans agenda lisible : ${n} liens vers le site officiel de la mairie`);
+}
 compte.sites = bySite.size;
 fs.mkdirSync(path.join(OUT, 'sources'), { recursive: true });
 fs.writeFileSync(path.join(OUT, 'sources', 'decouverte.json'), JSON.stringify({ version: 1, updated: now.toISOString(), compte, actifs, europe, vus }));
