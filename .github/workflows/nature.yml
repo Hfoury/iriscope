@@ -20,10 +20,10 @@ concurrency:
 jobs:
   region:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     strategy:
       fail-fast: false
-      max-parallel: 6
+      max-parallel: 2
       matrix:
         r: [alsace, aquitaine, auvergne, basse-normandie, bourgogne, bretagne, centre, champagne-ardenne, corse, franche-comte,
             haute-normandie, ile-de-france, languedoc-roussillon, limousin, lorraine, midi-pyrenees, nord-pas-de-calais,
@@ -32,23 +32,44 @@ jobs:
     steps:
       - name: Outil osmium
         run: sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
+      # le résultat de la dernière nuit réussie sert si les serveurs de téléchargement refusent ce soir
+      - uses: actions/cache/restore@v4
+        with:
+          path: ${{ matrix.r }}.geojsonseq.gz
+          key: nature-${{ matrix.r }}-${{ github.run_id }}
+          restore-keys: nature-${{ matrix.r }}-
       - name: Téléchargement et filtrage
+        id: dl
         run: |
-          set -e
           n=${{ matrix.r }}
-          for k in 1 2 3; do
-            curl -fsSL --retry 3 -A "iriscope-nature/1.0 (+https://hfoury.github.io/iriscope/)" -o "$n.osm.pbf" "https://download.geofabrik.de/europe/france/$n-latest.osm.pbf" && break
-            sleep 30
+          UA="iriscope-nature/1.0 (+https://hfoury.github.io/iriscope/)"
+          ok=0
+          for k in 1 2 3 4; do
+            for u in "https://download.geofabrik.de/europe/france/$n-latest.osm.pbf" "https://download.openstreetmap.fr/extracts/europe/france/$n-latest.osm.pbf" \
+                     "https://download.openstreetmap.fr/extracts/central-america/$n-latest.osm.pbf" "https://download.openstreetmap.fr/extracts/south-america/$n-latest.osm.pbf" \
+                     "https://download.openstreetmap.fr/extracts/africa/$n-latest.osm.pbf"; do
+              if curl -fsSL -A "$UA" -o "$n.osm.pbf" "$u"; then ok=1; echo "$n : $u ($(du -h "$n.osm.pbf" | cut -f1))"; break 2; fi
+            done
+            sleep $((60 * k))
           done
-          echo "$n : $(du -h "$n.osm.pbf" | cut -f1)"
-          osmium tags-filter -O -o "$n-f.osm.pbf" "$n.osm.pbf" \
-            nwr/tourism=viewpoint,attraction,picnic_site nwr/historic nwr/man_made=lighthouse \
-            nwr/natural=peak,waterfall,cape,arch,beach,wood nwr/natural=water nwr/waterway=river \
-            nwr/leisure=bathing_place,playground,horse_riding,fitness_station,fishing,marina nwr/sport nwr/rental \
-            nwr/harbour nwr/seamark:type nwr/landuse=forest
-          osmium export -O -f geojsonseq -a type,id -o "$n.geojsonseq" "$n-f.osm.pbf"
-          gzip -9 "$n.geojsonseq"
+          if [ $ok = 1 ]; then
+            set -e
+            osmium tags-filter -O -o "$n-f.osm.pbf" "$n.osm.pbf" \
+              nwr/tourism=viewpoint,attraction,picnic_site nwr/historic nwr/man_made=lighthouse \
+              nwr/natural=peak,waterfall,cape,arch,beach,wood nwr/natural=water nwr/waterway=river \
+              nwr/leisure=bathing_place,playground,horse_riding,fitness_station,fishing,marina nwr/sport nwr/rental \
+              nwr/harbour nwr/seamark:type nwr/landuse=forest
+            osmium export -O -f geojsonseq -a type,id -o "$n.geojsonseq" "$n-f.osm.pbf"
+            rm -f "$n.geojsonseq.gz"; gzip -9 "$n.geojsonseq"
+            echo "frais=1" >> "$GITHUB_OUTPUT"
+          elif [ -f "$n.geojsonseq.gz" ]; then echo "::warning::$n : téléchargement impossible, résultat de la nuit précédente réutilisé"
+          else echo "::error::$n : téléchargement impossible et aucun résultat précédent"; exit 1; fi
           echo "$n : $(zcat "$n.geojsonseq.gz" | wc -l) objets"
+      - uses: actions/cache/save@v4
+        if: steps.dl.outputs.frais == '1'
+        with:
+          path: ${{ matrix.r }}.geojsonseq.gz
+          key: nature-${{ matrix.r }}-${{ github.run_id }}
       - uses: actions/upload-artifact@v4
         with:
           name: nature-${{ matrix.r }}
