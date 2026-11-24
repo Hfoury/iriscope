@@ -1,0 +1,16 @@
+name: Diagnostic terrain
+# Manuel uniquement : teste la détection du terrain des zones, ne publie rien.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  terrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node outils/diag-terrain.mjs
