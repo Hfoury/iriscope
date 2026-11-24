@@ -54,6 +54,14 @@ for (const e of [
 // voisines, y compris celles qui touchent un autre département
 const CHEF_LIEU = new Set(editeurs.filter(e => e.type === 'préfecture' && e.insee).map(e => e.insee));
 const chef = ed => ed.type !== 'préfecture' && CHEF_LIEU.has(ed.insee) ? 0 : 1;
+// 24 nov : ensuite les communes de plus de 2 000 habitants (geo.api.gouv.fr, service public gratuit), pour couvrir vite les villes des zones
+const POP = {};
+try {
+  const r = await fetch('https://geo.api.gouv.fr/communes?fields=code,population&format=json', { signal: AbortSignal.timeout(60000) });
+  for (const c of await r.json()) POP[c.code] = c.population || 0;
+  console.log(`Population : ${Object.keys(POP).length} communes.`);
+} catch (e) { console.log(`Population indisponible : ${e.message}`); }
+const popOf = ed => POP[ed.insee] || 0;
 const bySite = new Map();
 for (const e of editeurs) { const k = normHost(e.site); if (!k) continue; if (!bySite.has(k)) bySite.set(k, e); }
 console.log(`Annuaire : ${editeurs.length} éditeurs avec site, ${bySite.size} sites distincts.`);
@@ -67,6 +75,8 @@ function listing(u) {
     return u;
   } catch (e) { return u; }
 }
+// lien vers UNE sortie précise dont la page liste ne répond pas : l'accueil du site plutôt qu'une sortie passée
+function deep(u) { try { if (listing(u) === u) return u; const x = new URL(u); return `${x.protocol}//${x.host}/`; } catch (e) { return u; } }
 function normHost(u) { try { const x = new URL(u); return x.hostname.replace(/^www\./, '').toLowerCase(); } catch (e) { return null; } }
 
 // ---------- état précédent ----------
@@ -91,7 +101,7 @@ const todo = [...bySite.entries()].filter(([h, ed]) => {
   if (v.r && v.r.agenda && listing(v.r.agenda) !== v.r.agenda && Date.parse(v.t) < Date.parse('2026-11-24T14:30:00Z')) return true;
   const age = now - Date.parse(v.t);
   return age > (v.r && v.r.q ? 7 * 86400000 : REVISIT);
-}).sort((a, b) => chef(a[1]) - chef(b[1]) || (vus[a[0]] ? 1 : 0) - (vus[b[0]] ? 1 : 0) || outreMer(a[1]) - outreMer(b[1]) || rank[a[1].type] - rank[b[1].type] || String((vus[a[0]] || {}).t || '').localeCompare(String((vus[b[0]] || {}).t || '')))
+}).sort((a, b) => chef(a[1]) - chef(b[1]) || (vus[a[0]] ? 1 : 0) - (vus[b[0]] ? 1 : 0) || (popOf(b[1]) >= 2000 ? 1 : 0) - (popOf(a[1]) >= 2000 ? 1 : 0) || outreMer(a[1]) - outreMer(b[1]) || rank[a[1].type] - rank[b[1].type] || String((vus[a[0]] || {}).t || '').localeCompare(String((vus[b[0]] || {}).t || '')))
   .slice(0, MAX);
 console.log(`${todo.length} sites à visiter cette nuit (max ${MAX}).`);
 
@@ -268,7 +278,7 @@ for (const [h, v] of Object.entries(vus)) {
   if (!best && r.agenda && ed.type !== 'préfecture' && !/demarche|presse|interdiction|arrete|manifestation-d-interet|reglementation/i.test(r.agenda)) best = { u: r.agenda, k: 'page', s: 'lien' };
   if (best) {
     compte.agendas++;
-    if (ed.lat != null) { const t = tileOf(ed.lat, ed.lon); (liens[t] = liens[t] || []).push({ n: ed.nom.replace(/^Mairie - /, ''), ty: ed.type, i: ed.insee, la: ed.lat, lo: ed.lon, u: best.k === 'ics' || best.k === 'rss' || best.k === 'atom' ? (r.agenda || best.u) : best.u, k: best.k, s: best.s, ...(chef(ed) === 0 ? { pref: 1 } : {}) }); }
+    if (ed.lat != null) { const t = tileOf(ed.lat, ed.lon); (liens[t] = liens[t] || []).push({ n: ed.nom.replace(/^Mairie - /, ''), ty: ed.type, i: ed.insee, la: ed.lat, lo: ed.lon, u: deep(best.k === 'ics' || best.k === 'rss' || best.k === 'atom' ? (r.agenda || best.u) : best.u), k: best.k, s: best.s, ...(chef(ed) === 0 ? { pref: 1 } : {}) }); }
   }
 }
 compte.sites = bySite.size;
