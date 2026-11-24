@@ -50,10 +50,23 @@ for (const e of [
   { id: 'gg-alderney', nom: 'Aurigny (States of Alderney)', type: 'interco', insee: 'GG', lat: 49.7140, lon: -2.2050, site: 'https://www.alderney.gov.gg/' },
   { id: 'gg-sark', nom: 'Sercq (Chief Pleas of Sark)', type: 'interco', insee: 'GG', lat: 49.4300, lon: -2.3600, site: 'https://www.gov.sark.gg/' },
 ]) editeurs.push(e);
+// 24 nov (Hervé) : les villes préfectures et sous-préfectures (chefs-lieux) d'abord, leur agenda sert de repère à toutes les zones
+// voisines, y compris celles qui touchent un autre département
+const CHEF_LIEU = new Set(editeurs.filter(e => e.type === 'préfecture' && e.insee).map(e => e.insee));
+const chef = ed => ed.type !== 'préfecture' && CHEF_LIEU.has(ed.insee) ? 0 : 1;
 const bySite = new Map();
 for (const e of editeurs) { const k = normHost(e.site); if (!k) continue; if (!bySite.has(k)) bySite.set(k, e); }
 console.log(`Annuaire : ${editeurs.length} éditeurs avec site, ${bySite.size} sites distincts.`);
 
+// 24 nov : on veut la page de la LISTE des sorties, pas une sortie précise (« …/evenement/52734/orchidees… » devient « …/evenement/ »)
+function listing(u) {
+  try {
+    const x = new URL(u); if (/\.(ics|xml|rss)$|\/feed\/?$/i.test(x.pathname)) return u;
+    const m = x.pathname.match(/^(.*?\/(agenda|agendas|evenements?|events?|sortir|sorties|animations|manifestations|que-faire[^/]*|whats-on|what-s-on))(\/|$)/i);
+    if (m && x.pathname.length > m[1].length + 1) { x.pathname = m[1] + '/'; x.search = ''; x.hash = ''; return x.href; }
+    return u;
+  } catch (e) { return u; }
+}
 function normHost(u) { try { const x = new URL(u); return x.hostname.replace(/^www\./, '').toLowerCase(); } catch (e) { return null; } }
 
 // ---------- état précédent ----------
@@ -74,9 +87,11 @@ const todo = [...bySite.entries()].filter(([h, ed]) => {
   const v = vus[h]; if (!v) return true;
   // 21 nov : îles Anglo-Normandes revues avec les mots anglais (What's on, Events)
   if (/^(JE|GG)$/.test(ed.insee) && v.r && !v.r.agenda && Date.parse(v.t) < Date.parse('2026-11-21T21:30:00Z')) return true;
+  // 24 nov : sites dont le lien menait à une sortie précise, revus pour trouver la page liste
+  if (v.r && v.r.agenda && listing(v.r.agenda) !== v.r.agenda && Date.parse(v.t) < Date.parse('2026-11-24T14:30:00Z')) return true;
   const age = now - Date.parse(v.t);
   return age > (v.r && v.r.q ? 7 * 86400000 : REVISIT);
-}).sort((a, b) => (vus[a[0]] ? 1 : 0) - (vus[b[0]] ? 1 : 0) || outreMer(a[1]) - outreMer(b[1]) || rank[a[1].type] - rank[b[1].type] || String((vus[a[0]] || {}).t || '').localeCompare(String((vus[b[0]] || {}).t || '')))
+}).sort((a, b) => chef(a[1]) - chef(b[1]) || (vus[a[0]] ? 1 : 0) - (vus[b[0]] ? 1 : 0) || outreMer(a[1]) - outreMer(b[1]) || rank[a[1].type] - rank[b[1].type] || String((vus[a[0]] || {}).t || '').localeCompare(String((vus[b[0]] || {}).t || '')))
   .slice(0, MAX);
 console.log(`${todo.length} sites à visiter cette nuit (max ${MAX}).`);
 
@@ -190,6 +205,8 @@ async function visit(host, ed) {
     try { const p = await get(agenda); const s2 = scan(p.text, p.url); for (const [k, v] of s2.feeds) feeds.set(k, v); s2.oa.forEach(x => oa.add(x)); lic = lic || s2.licence; agenda = p.url; } catch (e) { agenda = null; }
   }
   res.agenda = agenda;
+  // la page liste (sans la sortie précise) seulement si elle répond vraiment
+  if (agenda && listing(agenda) !== agenda) { try { const q = await get(listing(agenda)); if (q && q.text && q.text.length > 2000) res.agenda = q.url || listing(agenda); } catch (e) { /* on garde la page trouvée */ } }
   // flux : 4 au plus par site, iCal d'abord
   const list = [...feeds.entries()].sort((a, b) => (a[1] === 'ics' ? 0 : 1) - (b[1] === 'ics' ? 0 : 1)).slice(0, 4);
   for (const [u, k] of list) { await sleep(400); res.feeds.push(await testFeed(u, k, lic)); }
@@ -251,7 +268,7 @@ for (const [h, v] of Object.entries(vus)) {
   if (!best && r.agenda && ed.type !== 'préfecture' && !/demarche|presse|interdiction|arrete|manifestation-d-interet|reglementation/i.test(r.agenda)) best = { u: r.agenda, k: 'page', s: 'lien' };
   if (best) {
     compte.agendas++;
-    if (ed.lat != null) { const t = tileOf(ed.lat, ed.lon); (liens[t] = liens[t] || []).push({ n: ed.nom.replace(/^Mairie - /, ''), ty: ed.type, i: ed.insee, la: ed.lat, lo: ed.lon, u: best.k === 'ics' || best.k === 'rss' || best.k === 'atom' ? (r.agenda || best.u) : best.u, k: best.k, s: best.s }); }
+    if (ed.lat != null) { const t = tileOf(ed.lat, ed.lon); (liens[t] = liens[t] || []).push({ n: ed.nom.replace(/^Mairie - /, ''), ty: ed.type, i: ed.insee, la: ed.lat, lo: ed.lon, u: best.k === 'ics' || best.k === 'rss' || best.k === 'atom' ? (r.agenda || best.u) : best.u, k: best.k, s: best.s, ...(chef(ed) === 0 ? { pref: 1 } : {}) }); }
   }
 }
 compte.sites = bySite.size;
