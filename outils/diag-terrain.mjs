@@ -1,10 +1,10 @@
 // Diagnostic manuel : détection du terrain des zones (essai 1.05 n° 8), une petite requête par type, dans le carré de la zone.
-const zones = [['Quimper', 47.996, -4.102, 20], ['Chamonix', 45.923, 6.869, 15], ['Paris', 48.857, 2.352, 10]];
+const zones = [['Quimper', 47.996, -4.102, 20], ['Chamonix', 45.923, 6.869, 15], ['Rennes', 48.111, -1.68, 20]];
 const MIRRORS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
 const UA = { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Iriscope-diagnostic/1.0 (https://hfoury.github.io/iriscope/)' };
 const box = (lat, lon, km) => { const dl = km / 111, dn = km / (111 * Math.cos(lat * Math.PI / 180)); return `(${(lat - dl).toFixed(3)},${(lon - dn).toFixed(3)},${(lat + dl).toFixed(3)},${(lon + dn).toFixed(3)})`; };
 const PARTS = {
-  mer: b => `way["natural"="coastline"]${b}`,
+  mer: b => `(nwr["natural"="beach"]${b};nwr["leisure"="marina"]${b};nwr["harbour"]${b};nwr["seamark:type"]${b};)`,
   lac: b => `(way["natural"="water"]["water"~"^(lake|reservoir|lagoon)$"]["name"]${b};relation["natural"="water"]["water"~"^(lake|reservoir|lagoon)$"]["name"]${b};)`,
   riviere: b => `way["waterway"="river"]["name"]${b}`,
   foret: b => `(way["landuse"="forest"]${b};way["natural"="wood"]${b};relation["landuse"="forest"]${b};)`,
