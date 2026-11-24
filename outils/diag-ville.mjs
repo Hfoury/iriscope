@@ -18,3 +18,11 @@ for (const u of ['https://www.mairie-vannes.fr/agenda', 'https://www.mairie-vann
   for (const m of (t.match(/https?:\/\/[^"' <>]*(openagenda|\.ics|ical|feed|rss|tourinsoft|apidae)[^"' <>]*/gi) || []).slice(0, 8)) console.log('   lien :', m);
   const i = t.toLowerCase().indexOf('lumi'); if (i >= 0) console.log('   extrait :', t.slice(Math.max(0, i - 150), i + 150).replace(/\s+/g, ' '));
 }
+
+{ const t = (await get('https://www.mairie-vannes.fr/agenda')).t;
+  let k = 0, i = -1; const low = t.toLowerCase();
+  while ((i = low.indexOf('ical', i + 1)) >= 0 && k++ < 6) console.log('ICAL extrait :', t.slice(Math.max(0, i - 200), i + 150).replace(/\s+/g, ' '));
+  for (const m of (t.match(/(href|src|action)="[^"]*(agenda|event|evenement)[^"]*"/gi) || []).slice(0, 12)) console.log('ICAL href :', m);
+  for (const w of ['licence', 'Licence', 'mentions', 'CC BY', 'Etalab', 'open data', 'opendata']) if (t.includes(w)) console.log('ICAL mot :', w);
+  const j = t.toLowerCase().indexOf('faites des'); if (j >= 0) console.log('ICAL faites :', t.slice(j - 300, j + 300).replace(/\s+/g, ' '));
+}
