@@ -1,0 +1,28 @@
+name: Photos candidates
+# Manuel uniquement : rapporte des photos libres de Wikimedia Commons sur la branche de travail « photos-candidats ».
+# Rien n'est publié dans l'appli : le tri se fait ensuite à la main.
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  photos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node outils/photos-candidats.mjs
+      - name: Ranger sur la branche de travail
+        run: |
+          mv candidats /tmp/candidats
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan photos-candidats
+          git rm -rfq .
+          mv /tmp/candidats candidats
+          git add candidats
+          git commit -qm "Photos candidates"
+          git push -f origin photos-candidats
