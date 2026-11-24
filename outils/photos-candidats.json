@@ -1,11 +1,7 @@
 {
- "atelier": ["pottery wheel hands incategory:\"Quality images\"", "sewing machine close-up", "knitting needles wool", "paint brushes palette incategory:\"Quality images\"", "woodworking tools workbench"],
- "pro": ["empty conference room chairs", "laptop notebook desk", "meeting room table chairs incategory:\"Quality images\"", "auditorium seats empty"],
- "livres": ["library bookshelves incategory:\"Quality images\"", "old books shelf incategory:\"Quality images\"", "open book pages close-up"],
- "jeux": ["playing cards close-up", "chess pieces board incategory:\"Quality images\"", "bingo balls", "board game dice pawns"],
- "brocante": ["flea market stall antiques", "vide-grenier", "brocante France", "second hand toys market"],
- "solidaire": ["hands together teamwork", "blood donation bags", "heart hands", "volunteers hands"],
- "bienetre": ["yoga mat", "zen stones balance incategory:\"Quality images\"", "meditation candles"],
- "cafe": ["coffee cups table incategory:\"Quality images\"", "aperitif glasses table", "glasses toast terrace", "tapas snacks table"],
- "enfants": ["wooden toys incategory:\"Quality images\"", "colored pencils incategory:\"Quality images\"", "building blocks toys", "playground slide"]
+ "competition": ["trophy cup gold", "medals podium", "trophies shelf", "winner cup close-up"],
+ "sport": ["football ball grass close-up", "running track lanes incategory:\"Quality images\"", "sports hall interior empty", "basketball hoop", "tennis balls court"],
+ "brocante": ["antiques flea market table objects", "old books flea market", "marché aux puces objets", "garage sale items table", "vintage objects stall"],
+ "cafe": ["wine glasses table close-up", "aperitif olives glasses", "coffee cup saucer incategory:\"Quality images\"", "cheese board wine", "espresso cup table"],
+ "solidaire": ["donation box", "holding hands circle", "helping hands", "food bank boxes"]
 }
