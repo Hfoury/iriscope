@@ -1,33 +1,20 @@
 // Diagnostic manuel (25 nov 2026) : sources pour l'outre-mer, la Corse, Jersey-Guernesey et l'Andorre. N'écrit rien.
 // Vérifie que les liens officiels proposés répondent (statut et adresse finale seulement).
-const U = `https://www.jersey.com/events/
-https://www.visitguernsey.com/events/
-https://visitandorra.com/fr/agenda/
-https://www.st-martin.org/
-https://www.saintbarth-tourisme.com/
-https://www.wallis-et-futuna.gouv.fr/
-https://www.spm-tourisme.fr/
-https://vigilance.meteofrance.fr/fr/guadeloupe
-https://vigilance.meteofrance.fr/fr/martinique
-https://vigilance.meteofrance.fr/fr/guyane
-https://vigilance.meteofrance.fr/fr/la-reunion
-https://vigilance.meteofrance.fr/fr/mayotte
-https://meteofrance.gp/fr/vigilance
-https://meteofrance.mq/fr/vigilance
-https://meteofrance.gf/fr/vigilance
-https://meteofrance.re/fr/vigilance
-https://meteofrance.yt/fr/vigilance
-https://meteofrance.pm/fr/vigilance
-https://meteofrance.wf/fr/vigilance
-https://www.meteo.nc/nouvelle-caledonie/vigilance
-https://meteo.pf/fr/vigilance
-https://www.gov.je/weather/
-https://www.meteo.ad/
-https://www.gov.je/News/Pages/default.aspx
-https://www.gov.je/_layouts/15/C5.Gov.Je.CMS/Feeds/GovJeNews.aspx
-https://brocabrac.fr/
-https://vide-greniers.org/
-https://feeds.meteoalarm.org/api/v1/warnings/feeds-andorra`.split('\n');
+const U = `https://www.lesilesdeguadeloupe.com/
+https://www.martinique.org/
+https://www.guyane-amazonie.fr/
+https://www.reunion.fr/
+https://mayotte-tourisme.com/
+https://www.tahititourisme.fr/
+https://www.nouvellecaledonie.travel/
+https://www.visit-corsica.com/
+https://www.meteo.nc/
+https://www.meteo.nc/nouvelle-caledonie/vigilance/vigilance-meteo
+https://la1ere.franceinfo.fr/guadeloupe/
+https://la1ere.franceinfo.fr/wallisfutuna/
+https://www.gov.je/news/
+https://www.gov.je/News/RSS/Pages/default.aspx
+https://www.gov.gg/news`.split('\n');
 for (const u of U) {
   const t0 = Date.now();
   try {
