@@ -1,25 +1,39 @@
 // Diagnostic manuel (25 nov 2026) : sources pour l'outre-mer, la Corse, Jersey-Guernesey et l'Andorre. N'écrit rien.
-const H = { Origin: 'https://hfoury.github.io', Accept: 'application/json, text/xml, application/xml, */*' };
-async function get(n, u, show = 300) {
+// Vérifie que les liens officiels proposés répondent (statut et adresse finale seulement).
+const U = `https://www.jersey.com/events/
+https://www.visitguernsey.com/events/
+https://visitandorra.com/fr/agenda/
+https://www.st-martin.org/
+https://www.saintbarth-tourisme.com/
+https://www.wallis-et-futuna.gouv.fr/
+https://www.spm-tourisme.fr/
+https://vigilance.meteofrance.fr/fr/guadeloupe
+https://vigilance.meteofrance.fr/fr/martinique
+https://vigilance.meteofrance.fr/fr/guyane
+https://vigilance.meteofrance.fr/fr/la-reunion
+https://vigilance.meteofrance.fr/fr/mayotte
+https://meteofrance.gp/fr/vigilance
+https://meteofrance.mq/fr/vigilance
+https://meteofrance.gf/fr/vigilance
+https://meteofrance.re/fr/vigilance
+https://meteofrance.yt/fr/vigilance
+https://meteofrance.pm/fr/vigilance
+https://meteofrance.wf/fr/vigilance
+https://www.meteo.nc/nouvelle-caledonie/vigilance
+https://meteo.pf/fr/vigilance
+https://www.gov.je/weather/
+https://www.meteo.ad/
+https://www.gov.je/News/Pages/default.aspx
+https://www.gov.je/_layouts/15/C5.Gov.Je.CMS/Feeds/GovJeNews.aspx
+https://brocabrac.fr/
+https://vide-greniers.org/
+https://feeds.meteoalarm.org/api/v1/warnings/feeds-andorra`.split('\n');
+for (const u of U) {
   const t0 = Date.now();
   try {
-    const r = await fetch(u, { headers: H, signal: AbortSignal.timeout(25000) });
+    const r = await fetch(u, { headers: { Accept: 'text/html,application/xhtml+xml,application/json,*/*' }, signal: AbortSignal.timeout(20000) });
     const body = await r.text();
-    console.log(`\n## ${n} : HTTP ${r.status} en ${Date.now() - t0} ms, ACAO=${r.headers.get('access-control-allow-origin')}, ${body.length} octets\n${body.slice(0, show).replace(/\s+/g, ' ')}`);
-    return body;
-  } catch (e) { console.log(`\n## ${n} : ÉCHEC en ${Date.now() - t0} ms : ${e.message} ${e.cause ? e.cause.code || '' : ''}`); return ''; }
-}
-const Z = ['metropole', 'alsace-moselle', 'guadeloupe', 'guyane', 'la-reunion', 'martinique', 'mayotte', 'nouvelle-caledonie', 'polynesie-francaise', 'saint-barthelemy', 'saint-martin', 'saint-pierre-et-miquelon', 'wallis-et-futuna'];
-for (const z of Z) await get(`fériés ${z} 2027`, `https://calendrier.api.gouv.fr/jours-feries/${z}/2027.json`, 1200);
-await get('vigilance Andorre (json)', 'https://feeds.meteoalarm.org/api/v1/warnings/feeds-andorra', 600);
-await get('vigilance Andorre (atom)', 'https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-andorra', 900);
-await get('actus Jersey', 'https://www.gov.je/_layouts/15/C5.Gov.Je.CMS/Feeds/News.aspx', 900);
-await get('actus Jersey (open data)', 'https://opendata.gov.je/dataset/gov-je-news', 400);
-for (const q of ['Nouméa', 'Papeete', 'Mata-Utu', 'Saint-Pierre 97500', 'Marigot', 'Gustavia', 'Mamoudzou', 'Saint-Hélier', 'Saint Peter Port', 'Andorre-la-Vieille', 'Ajaccio']) {
-  await get(`communes « ${q} » (Géoplateforme)`, `https://data.geopf.fr/geocodage/search?q=${encodeURIComponent(q)}&type=municipality&limit=2`, 500);
-  await get(`lieux « ${q} » (Photon)`, `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=fr&limit=2`, 500);
-}
-for (const [n, lat, lon] of [['Saint-Hélier', 49.186, -2.106], ['Andorre-la-Vieille', 42.507, 1.521], ['Nouméa', -22.276, 166.458], ['Fort-de-France', 14.604, -61.067]]) {
-  const q = `[out:json][timeout:25];(nwr["amenity"="marketplace"](around:25000,${lat},${lon}););out center tags 20;`;
-  await get(`marchés OSM autour de ${n}`, `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`, 500);
+    const title = (body.match(/<title[^>]*>([^<]*)/i) || [])[1] || '';
+    console.log(`${r.status} ${u} -> ${r.url} (${body.length} o, ${Date.now() - t0} ms) ${title.trim().slice(0, 90)}`);
+  } catch (e) { console.log(`ECHEC ${u} : ${e.message} ${e.cause ? e.cause.code || '' : ''}`); }
 }
