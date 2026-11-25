@@ -20,6 +20,13 @@ async function look(u, deep) {
     for (const l of legal) await look(new URL(l, base).href, false);
   } catch (e) { console.log(`ECHEC ${u} : ${e.message} ${e.cause ? e.cause.code || '' : ''}`); }
 }
-await look(`${base}/brocante-outremer`, true);
-await look(`${base}/robots.txt`, false);
-await look(`${base}/`, true);
+for (const u of [`${base}/mentions-legales`, `${base}/contact`, `${base}/`]) {
+  try {
+    const { r, body } = await get(u);
+    console.log(`\n## ${r.status} ${u}`);
+    console.log('  mailto :', [...new Set([...body.matchAll(/mailto:([^"'?]+)/g)].map(m => m[1]))].join(' '));
+    console.log('  adresses :', [...new Set(body.match(/[\w.+-]+@[\w-]+\.[\w.-]+/g) || [])].slice(0, 8).join(' '));
+    console.log('  liens contact :', [...new Set([...body.matchAll(/href="([^"]*(contact|redaction|ecrire|publier)[^"]*)"/gi)].map(m => m[1]))].slice(0, 8).join(' '));
+    const t = text(body); const i = t.search(/[ÉE]diteur/); console.log('  éditeur :', t.slice(Math.max(0, i), i + 900));
+  } catch (e) { console.log(`ECHEC ${u} : ${e.message}`); }
+}
