@@ -1,10 +1,10 @@
 name: Boîte à idées
 
-# Toutes les 3 heures (0.66.0) : regroupe les idées, les appuis et les décisions du responsable envoyés depuis l'appli et les publie sur la branche « idees ».
+# Toutes les 30 minutes (27 nov 2026 ; toutes les 3 heures avant) : regroupe les idées, les appuis et les décisions du responsable envoyés depuis l'appli et les publie sur la branche « idees ».
 # Gratuit, sans clé. Les messages ntfy ne sont gardés que 12 heures : ce passage régulier les rend durables.
 on:
   schedule:
-    - cron: '41 */3 * * *'
+    - cron: '11,41 * * * *'
   workflow_dispatch:
 
 permissions:
