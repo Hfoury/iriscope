@@ -7,6 +7,15 @@ const UA = 'iriscope-sources/1.0 (+https://github.com/Hfoury/iriscope)';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const ent = s => String(s || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
   .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n)).replace(/\(…\)$/, '').replace(/\s+/g, ' ').trim();
+// Descriptif gardé dans les tuiles : 600 caractères au plus, coupé à la fin d'une phrase (sinon au dernier mot entier, avec « … »).
+// Avant : 300 caractères tout rond, donc des textes coupés en plein mot (« Certaines sont recher »).
+export const couper = (t, max = 600) => {
+  const x = String(t || '').replace(/\s+/g, ' ').trim();
+  if (x.length <= max) return x;
+  const part = x.slice(0, max);
+  const fin = Math.max(part.lastIndexOf('. '), part.lastIndexOf('! '), part.lastIndexOf('? '));
+  return fin > max * 0.5 ? part.slice(0, fin + 1) : `${part.replace(/\s+\S*$/, '').replace(/[,;:(«\-–]+$/, '').trim()}…`;
+};
 const hm = v => String(v || '').match(/\d{2}:\d{2}/)?.[0] || '';
 const d10 = v => String(v || '').slice(0, 10);
 const list = v => (v == null ? [] : Array.isArray(v) ? v : String(v).split(/[;,|]/)).map(x => ent(x)).filter(Boolean);
@@ -40,7 +49,7 @@ export const AGENDAS = [
         const key = `${r.id_manif || r.nom}`;
         if (!by.has(key)) by.set(key, {
           id: `nantes-${key}`, t: ent(r.nom), ...g, c: ent(r.ville), a: ent(r.adresse || r.lieu).slice(0, 80), cp: cpOf(r.code_postal),
-          p: [], d: ent(r.description_evt).slice(0, 300), k: [...list(r.types_libelles), ...list(r.themes_libelles), ...(/^oui/i.test(r.gratuit || '') ? ['gratuit'] : [])].slice(0, 8),
+          p: [], d: couper(ent(r.description_evt)), k: [...list(r.types_libelles), ...list(r.themes_libelles), ...(/^oui/i.test(r.gratuit || '') ? ['gratuit'] : [])].slice(0, 8),
           u: r.lien_agenda || r.url_site || '',
         });
         by.get(key).p.push({ s: d10(r.date), e: d10(r.date), st: hm(r.heure_debut), et: hm(r.heure_fin) });
@@ -55,7 +64,7 @@ export const AGENDAS = [
       return rows.map((r, i) => {
         const g = geoOf(r); if (!g || !r.titre) return null;
         return { id: `occ-${(r.url || '').split('-').pop() || i}`, t: ent(r.titre), ...g, c: ent(r.commune), a: ent(r.adresse).slice(0, 80), cp: cpOf((String(r.adresse || '').match(/\b\d{5}\b/) || [])[0]),
-          p: [{ s: d10(r.date_debut), e: d10(r.date_fin || r.date_debut), st: '', et: '' }], d: ent(r.description).slice(0, 300), k: list(r.thematique).filter(x => x !== 'Autres'), u: r.url || '' };
+          p: [{ s: d10(r.date_debut), e: d10(r.date_fin || r.date_debut), st: '', et: '' }], d: couper(ent(r.description)), k: list(r.thematique).filter(x => x !== 'Autres'), u: r.url || '' };
       });
     },
   },
@@ -66,7 +75,7 @@ export const AGENDAS = [
       return rows.map(r => {
         const g = geoOf(r); if (!g || !r.titre) return null;
         return { id: `occm-${r.identifiant}`, t: ent(r.titre), ...g, c: ent(r.ville), a: ent(r.nom_du_lieu || r.adresse_du_lieu).slice(0, 80), cp: cpOf(r.code_postal_du_lieu),
-          p: [{ s: d10(r.date_debut), e: d10(r.date_fin || r.date_debut), st: hm(r.horaire_1_debut), et: hm(r.horaire_1_fin) }], d: ent(r.a_propos || r.description).slice(0, 300),
+          p: [{ s: d10(r.date_debut), e: d10(r.date_fin || r.date_debut), st: hm(r.horaire_1_debut), et: hm(r.horaire_1_fin) }], d: couper(ent(r.a_propos || r.description)),
           k: [...list(r.theme), ...(/oui/i.test(r.conditions_de_participation_gratuit_oui_non || '') ? ['gratuit'] : [])].slice(0, 8), u: r.site_web_de_l_evenement || '' };
       });
     },
@@ -78,7 +87,7 @@ export const AGENDAS = [
       return rows.map(r => {
         const g = geoOf(r); if (!g || !r.title) return null;
         return { id: `ccac-${r.id}`, t: ent(r.title), ...g, c: ent(r.city_name || r.author_name?.replace(/^Mairie (de )?/i, '')), a: ent(r.address_label).slice(0, 80), cp: '',
-          p: [{ s: d10(r.start_date), e: d10(r.end_date || r.start_date), st: hm(r.start_time), et: hm(r.end_time) }], d: ent(r.description).slice(0, 300), k: list(r.category_name), u: r.shared_url || '' };
+          p: [{ s: d10(r.start_date), e: d10(r.end_date || r.start_date), st: hm(r.start_time), et: hm(r.end_time) }], d: couper(ent(r.description)), k: list(r.category_name), u: r.shared_url || '' };
       });
     },
   },
@@ -90,7 +99,7 @@ export const AGENDAS = [
         const g = geoOf(r); if (!g || !r.nom) return null;
         return { id: `cfd-${r.id}`, t: ent(r.nom), ...g, c: ent(r.localisation_adresse_commune_nom), a: ent(r.localisation_adresse_nomdulieu || r.localisation_adresse_adresse1).slice(0, 80), cp: cpOf(r.localisation_adresse_codepostal),
           p: [{ s: d10(r.ouverture_datedebut), e: d10(r.ouverture_datefin || r.ouverture_datedebut), st: hm(r.ouverture_horaireouverture), et: hm(r.ouverture_horairefermeture) }],
-          d: ent(r.presentation).slice(0, 300), k: [...list(r.informationsfeteetmanifestation_typesmanifestation_item_libellefr), ...list(r.informationsfeteetmanifestation_categories_item_libellefr)].slice(0, 8),
+          d: couper(ent(r.presentation)), k: [...list(r.informationsfeteetmanifestation_typesmanifestation_item_libellefr), ...list(r.informationsfeteetmanifestation_categories_item_libellefr)].slice(0, 8),
           u: (String(r.informations_moyenscommunication_siteweb || '').match(/https?:\/\/\S+/) || [''])[0] };
       });
     },
@@ -130,7 +139,7 @@ AGENDAS.push(
         if (!p.length) return null;
         const free = /gratuit|libre|free/i.test(r.conditions_fr || '');
         return { id: `oa-${r.uid || t}`, t: t.slice(0, 140), ...g, c: ent(r.location_city), a: ent(r.location_name || r.location_address).slice(0, 80), cp: cpOf(r.location_postalcode),
-          p, d: ent(r.description_fr).slice(0, 300), k: [...list(r.keywords_fr), ...(free ? ['gratuit'] : [])].slice(0, 8), u: r.canonicalurl || '' };
+          p, d: couper(ent(r.description_fr)), k: [...list(r.keywords_fr), ...(free ? ['gratuit'] : [])].slice(0, 8), u: r.canonicalurl || '' };
       });
     },
   },
@@ -147,7 +156,7 @@ AGENDAS.push(
         if (!p.length) return null;
         const free = /gratuit/i.test(`${r.price_type || ''} ${r.price_detail || ''}`);
         return { id: `paris-${r.id || t}`, t: t.slice(0, 140), ...g, c: ent(r.address_city || 'Paris'), a: ent(r.address_name).slice(0, 80), cp: cpOf(r.address_zipcode),
-          p, d: ent(r.lead_text || r.description).slice(0, 300), k: [...list(r.qfap_tags), ...(free ? ['gratuit'] : [])].slice(0, 8), u: r.url || '' };
+          p, d: couper(ent(r.lead_text || r.description)), k: [...list(r.qfap_tags), ...(free ? ['gratuit'] : [])].slice(0, 8), u: r.url || '' };
       });
     },
   },

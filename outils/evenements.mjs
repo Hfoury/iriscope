@@ -5,7 +5,7 @@
 // Usage : DATATOURISME_KEY=... node outils/evenements.mjs sortie
 import fs from 'node:fs';
 import path from 'node:path';
-import { lireAgendas } from './agendas.mjs';
+import { lireAgendas, couper } from './agendas.mjs';
 
 const KEY = process.env.DATATOURISME_KEY;
 if (!KEY) { console.error('Secret DATATOURISME_KEY absent : ajoute-le dans Settings > Secrets and variables > Actions.'); process.exit(2); }
@@ -85,7 +85,7 @@ function toEvent(o) {
   return { dept, ev: {
     id: o.uuid, t: fr(o.label).trim().slice(0, 140), lat: +lat.toFixed(5), lon: +lon.toFixed(5),
     c: fr(city.label) || fr(ad.addressLocality), a: fr(ad.streetAddress).slice(0, 80), cp,
-    p: periods.slice(0, 6), d: desc.replace(/\s+/g, ' ').trim().slice(0, 300),
+    p: periods.slice(0, 6), d: couper(desc),
     k: [...arr(o.type).map(fr), ...arr(o.hasTheme).map(t => fr(t.label ?? t))].filter(x => x && !/^(schema:|PointOfInterest|EntertainmentAndEvent)/.test(x)).slice(0, 8),
     u: arr(arr(o.hasContact)[0]?.homepage)[0] || '',
     ...affiche(o),
