@@ -11,7 +11,9 @@ import { checkText } from './moderation.mjs';
 
 const TOPIC = 'iriscope-idees-7f3a91c2d5e8';
 export const THEMES = ['Sorties', 'Météo et alertes', 'Pratique', 'Famille', 'Cartes', 'Sources', 'Apparence', 'Autre'];
-const STATUS = ['new', 'accepted', 'refused', 'hold', 'dev', 'done'];
+// 27 nov 2026 : « vote » = idée soumise à la communauté par le responsable ; chacun répond « pour » (t: 's') ou « pas utile pour moi » (t: 'n'),
+// une seule réponse par téléphone (la dernière compte)
+const STATUS = ['new', 'accepted', 'refused', 'hold', 'dev', 'done', 'vote'];
 const CHAIN = 500;
 const args = process.argv.slice(2);
 const opt = k => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
@@ -47,6 +49,11 @@ for (const line of lines) {
   } else if (r.t === 's') {
     const o = st.items[clean(r.id, 40)]; if (!o || o.hidden || !r.d) continue;
     const who = dh(r.d); if (!o.sup.includes(who)) { o.sup.push(who); sups++; }
+    if (o.con) o.con = o.con.filter(x => x !== who);
+  } else if (r.t === 'n') {
+    const o = st.items[clean(r.id, 40)]; if (!o || o.hidden || !r.d || o.st !== 'vote') continue;
+    const who = dh(r.d); o.con = o.con || []; if (!o.con.includes(who)) { o.con.push(who); sups++; }
+    o.sup = o.sup.filter(x => x !== who);
   } else if (r.t === 'a' && st.anchor && /^[0-9a-f]{64}$/.test(r.a || '')) {
     // chaîne à usage unique : la valeur envoyée doit, hachée 1 à 60 fois, donner l'ancre courante
     let x = r.a, j = 0, ok = false;
@@ -77,7 +84,7 @@ for (const [id, o] of Object.entries(st.items)) if (o.hidden && now - o.t > 30 *
 st.seen = [...seen].slice(-4000);
 st.updated = new Date().toISOString();
 fs.mkdirSync(OUT, { recursive: true });
-const pub = { updated: st.updated, ai: st.ai || 0, themes: THEMES, items: live.map(o => ({ id: o.id, ti: o.ti, x: o.x, th: o.th, n: o.n, t: o.t, st: o.st, rep: o.rep, u: o.sup.length, s: o.sup.slice(0, 400), ...(o.sim ? { sim: o.sim } : {}), ...(o.merged ? { m: o.merged.length } : {}) })).sort((a, b) => b.u - a.u || b.t - a.t) };
+const pub = { updated: st.updated, ai: st.ai || 0, themes: THEMES, items: live.map(o => ({ id: o.id, ti: o.ti, x: o.x, th: o.th, n: o.n, t: o.t, st: o.st, rep: o.rep, u: o.sup.length, s: o.sup.slice(0, 400), ...(o.con && o.con.length ? { d: o.con.length, c: o.con.slice(0, 400) } : {}), ...(o.sim ? { sim: o.sim } : {}), ...(o.merged ? { m: o.merged.length } : {}) })).sort((a, b) => (b.st === 'vote') - (a.st === 'vote') || b.u - a.u || b.t - a.t) };
 fs.writeFileSync(path.join(OUT, 'idees.json'), JSON.stringify(pub));
 // l'état complet (ancre, vus) reste sur la branche pour le passage suivant
 fs.writeFileSync(path.join(OUT, 'etat.json'), JSON.stringify(st));
