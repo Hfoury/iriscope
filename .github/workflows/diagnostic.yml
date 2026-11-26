@@ -15,4 +15,4 @@ jobs:
           node-version: 22
       - env:
           DATATOURISME_KEY: ${{ secrets.DATATOURISME_KEY }}
-        run: node outils/diagnostic.mjs
+        run: node outils/diag-vacances.mjs && node outils/diagnostic.mjs
