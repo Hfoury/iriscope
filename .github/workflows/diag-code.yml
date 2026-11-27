@@ -1,0 +1,16 @@
+name: Diagnostic code de connexion
+# Manuel uniquement : demande un code de connexion pour la boîte de contact du projet et affiche la réponse. Ne publie rien.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node outils/diag-code.mjs
